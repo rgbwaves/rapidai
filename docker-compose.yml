@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: rapid_ai_engine/Dockerfile
+    environment:
+      - SERVICE_FQDN_API=https://rapidapi.rdtect.com
     expose:
       - "8000"
     restart: unless-stopped
@@ -18,9 +20,9 @@ services:
       context: ./dashboard
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ""
+        VITE_API_URL: "https://rapidapi.rdtect.com"
     environment:
-      - SERVICE_FQDN_DASHBOARD=https://rapidai.rdtect.com
+      - SERVICE_FQDN_DASHBOARD=https://rapiddash.rdtect.com
     expose:
       - "80"
     depends_on:
