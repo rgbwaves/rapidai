@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: rapid_ai_engine/Dockerfile
     environment:
-      - SERVICE_FQDN_API_8000
+      SERVICE_FQDN_API_8000: ""
     expose:
       - "8000"
     restart: unless-stopped
@@ -22,7 +22,7 @@ services:
       args:
         VITE_API_URL: ${SERVICE_URL_API_8000:-http://api:8000}
     environment:
-      - SERVICE_FQDN_DASHBOARD
+      SERVICE_FQDN_DASHBOARD: ""
     expose:
       - "80"
     depends_on:
