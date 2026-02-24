@@ -22,8 +22,6 @@ services:
     build:
       context: ./dashboard
       dockerfile: Dockerfile
-      args:
-        VITE_API_URL: ${SERVICE_URL_API_8000:-http://api:8000}
     environment:
       SERVICE_FQDN_DASHBOARD: ""
     expose:

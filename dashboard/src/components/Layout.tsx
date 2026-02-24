@@ -67,7 +67,7 @@ export default function Layout({ children }: Props) {
         {/* Footer */}
         <div className="p-4 border-t border-slate-800 text-[10px] text-slate-600 space-y-1.5">
           <a
-            href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/docs`}
+            href="/docs"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-slate-500 hover:text-sky-400 transition-colors"

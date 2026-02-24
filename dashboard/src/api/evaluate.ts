@@ -1,4 +1,4 @@
-import { apiPost } from './client'
+import { apiPost, apiGet } from './client'
 import type { FullAnalysisResponse } from '../types/rapid-ai'
 
 export interface EvaluateRequest {
@@ -30,8 +30,5 @@ export async function evaluateAsset(request: EvaluateRequest): Promise<FullAnaly
 }
 
 export async function healthCheck(): Promise<{ status: string }> {
-  const res = await fetch(
-    `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/health`
-  )
-  return res.json()
+  return apiGet<{ status: string }>('/health')
 }
