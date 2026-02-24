@@ -1,40 +1,373 @@
+/* ── Google Fonts ──────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design Tokens (CSS custom properties) ─────────────────────────────────── */
 @layer base {
   :root {
-    --color-normal: #22c55e;
-    --color-watch: #eab308;
+    /* Severity colors */
+    --color-normal:  #22c55e;
+    --color-watch:   #eab308;
     --color-warning: #f97316;
-    --color-alarm: #ef4444;
+    --color-alarm:   #ef4444;
+
+    /* Health colors */
+    --color-healthy:   #22c55e;
+    --color-degrading: #eab308;
+    --color-unstable:  #f97316;
+    --color-critical:  #ef4444;
+    --color-blocked:   #6b7280;
+
+    /* Chart palette */
+    --chart-1: #38bdf8;
+    --chart-2: #a78bfa;
+    --chart-3: #34d399;
+    --chart-4: #fb923c;
+    --chart-5: #f472b6;
+    --chart-6: #94a3b8;
+
+    /* Surface hierarchy */
+    --surface-0: #020617;
+    --surface-1: #0f172a;
+    --surface-2: #1e293b;
+    --surface-3: #293548;
+
+    /* Layout dimensions */
+    --sidebar-width-collapsed: 56px;
+    --sidebar-width-expanded:  220px;
+    --command-bar-height:      56px;
+    --canvas-gutter:           24px;
+
+    /* Animation */
+    --duration-fast:   100ms;
+    --duration-base:   150ms;
+    --duration-slow:   250ms;
+    --duration-view:   300ms;
+    --ease-spring:     cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    --ease-out-expo:   cubic-bezier(0.16, 1, 0.3, 1);
+
+    /* Gauge */
+    --gauge-circumference: 0;
+    --gauge-offset: 0;
+  }
+
+  /* ── Base document ─────────────────────────────────────────────────────── */
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   body {
-    @apply bg-slate-950 text-slate-200;
+    @apply bg-[#020617] text-slate-200 font-sans;
+    font-feature-settings: "kern" 1, "liga" 1, "cv11" 1;
   }
 
-  /* Custom scrollbar */
-  ::-webkit-scrollbar {
-    width: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    @apply bg-slate-900;
-  }
+  /* ── Custom scrollbar ──────────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
     @apply bg-slate-700 rounded-full;
   }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-slate-600; }
+
+  /* ── Focus ring ────────────────────────────────────────────────────────── */
+  :focus-visible {
+    @apply outline-2 outline-sky-400 outline-offset-2;
+  }
+
+  /* ── Selection ─────────────────────────────────────────────────────────── */
+  ::selection {
+    background: rgba(56, 189, 248, 0.25);
+    color: inherit;
+  }
 }
 
+/* ── Component Layer ──────────────────────────────────────────────────────── */
 @layer components {
+
+  /* ── Shell layout ────────────────────────────────────────────────────── */
+  .app-shell {
+    @apply flex h-screen overflow-hidden bg-[#020617];
+  }
+
+  .command-bar {
+    height: var(--command-bar-height);
+    @apply flex-shrink-0 flex items-center gap-3
+           border-b border-slate-800/80
+           bg-[#0a1628]/90 backdrop-blur-glass
+           px-4;
+    /* Glass effect + subtle noise */
+    box-shadow: 0 1px 0 rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.02);
+  }
+
+  .sidebar {
+    width: var(--sidebar-width-expanded);
+    @apply flex-shrink-0 flex flex-col
+           border-r border-slate-800/60
+           bg-[#0a1628]
+           overflow-hidden;
+    transition: width var(--duration-view) var(--ease-out-expo);
+  }
+
+  .sidebar.collapsed {
+    width: var(--sidebar-width-collapsed);
+  }
+
+  .canvas {
+    @apply flex-1 overflow-y-auto;
+    padding: var(--canvas-gutter);
+  }
+
+  /* ── Card variants ──────────────────────────────────────────────────── */
+  /* Default: sits on surface-1 bg */
   .card {
-    @apply bg-slate-800/80 border border-slate-700/50 rounded-xl p-4 backdrop-blur-sm;
+    @apply bg-slate-800/60 border border-slate-700/50 rounded-card p-4;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.35);
   }
+
+  /* Elevated: floats above surface-1 */
+  .card-elevated {
+    @apply bg-slate-800 border border-slate-600/40 rounded-card p-4;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5), 0 1px 4px rgba(0,0,0,0.4);
+  }
+
+  /* Glass: for command bar overlays, hero panels */
+  .card-glass {
+    @apply border border-white/5 rounded-card p-4
+           backdrop-blur-glass;
+    background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset,
+                0 4px 16px rgba(0,0,0,0.4);
+  }
+
+  /* ── Card title ──────────────────────────────────────────────────────── */
   .card-title {
-    @apply text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2;
+    @apply text-label-md uppercase tracking-wider text-slate-400 mb-2;
   }
+
+  /* ── Gauge ───────────────────────────────────────────────────────────── */
   .gauge-ring {
     fill: none;
     stroke-linecap: round;
+  }
+
+  /* ── Badges ──────────────────────────────────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center font-semibold rounded-badge border
+           text-label-md uppercase tracking-wider px-2 py-0.5;
+  }
+
+  .badge-severity-normal  { @apply bg-green-500/15 text-green-400 border-green-500/25; }
+  .badge-severity-watch   { @apply bg-yellow-500/15 text-yellow-400 border-yellow-500/25; }
+  .badge-severity-warning { @apply bg-orange-500/15 text-orange-400 border-orange-500/25; }
+  .badge-severity-alarm   { @apply bg-red-500/15 text-red-400 border-red-500/25; }
+
+  .badge-health-healthy   { @apply bg-green-500/15 text-green-400 border-green-500/25; }
+  .badge-health-degrading { @apply bg-yellow-500/15 text-yellow-400 border-yellow-500/25; }
+  .badge-health-unstable  { @apply bg-orange-500/15 text-orange-400 border-orange-500/25; }
+  .badge-health-critical  { @apply bg-red-500/15 text-red-400 border-red-500/25; }
+  .badge-health-blocked   { @apply bg-gray-500/15 text-gray-400 border-gray-500/25; }
+
+  /* ── Status dot ──────────────────────────────────────────────────────── */
+  .status-dot {
+    @apply w-2 h-2 rounded-full inline-block flex-shrink-0;
+  }
+  .status-dot-live     { @apply bg-green-400; }
+  .status-dot-idle     { @apply bg-slate-500; }
+  .status-dot-loading  { @apply bg-sky-400; }
+  .status-dot-error    { @apply bg-red-400; }
+
+  /* ── Pulsing status ring — health indicator ──────────────────────────── */
+  .pulse-ring {
+    @apply relative inline-flex;
+  }
+  .pulse-ring::before {
+    content: '';
+    @apply absolute inset-0 rounded-full;
+    animation: pulse-ring 2s ease-in-out infinite;
+    background: currentColor;
+    opacity: 0.3;
+  }
+
+  /* ── Buttons ─────────────────────────────────────────────────────────── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2
+           font-semibold rounded-lg text-sm
+           transition-all duration-150
+           focus-visible:outline-2 focus-visible:outline-sky-400 focus-visible:outline-offset-2
+           disabled:opacity-40 disabled:cursor-not-allowed
+           min-h-[36px] px-4 py-2;
+    /* Ensure 44px touch target via padding on mobile */
+  }
+
+  .btn-primary {
+    @apply btn bg-sky-500 text-white hover:bg-sky-400 active:bg-sky-600;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1);
+  }
+  .btn-primary:not(:disabled):hover {
+    box-shadow: 0 0 12px rgba(56,189,248,0.3), 0 1px 0 rgba(0,0,0,0.2);
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-slate-300 hover:text-white hover:bg-slate-700/60 active:bg-slate-700;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-500/20 text-red-400 border border-red-500/30
+           hover:bg-red-500/30 hover:border-red-500/50 active:bg-red-500/40;
+  }
+
+  /* Analyze button — special loading state */
+  .btn-analyze {
+    @apply btn-primary relative overflow-hidden min-w-[120px];
+  }
+  .btn-analyze.loading::after {
+    content: '';
+    @apply absolute inset-0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.12) 50%, transparent 100%);
+    background-size: 400px 100%;
+    animation: scan-line 1.2s ease-in-out infinite;
+  }
+
+  /* ── Sidebar nav item ────────────────────────────────────────────────── */
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
+           transition-all duration-base cursor-pointer
+           text-slate-400 hover:text-slate-200 hover:bg-slate-800/70;
+    min-height: 44px;
+  }
+  .nav-item.active {
+    @apply bg-sky-500/10 text-sky-400;
+    box-shadow: inset 2px 0 0 #38bdf8;
+  }
+  .nav-item .nav-icon {
+    @apply w-5 h-5 flex-shrink-0;
+  }
+  .nav-item .nav-label {
+    @apply transition-all duration-view whitespace-nowrap overflow-hidden;
+  }
+
+  /* ── Command bar input ───────────────────────────────────────────────── */
+  .cmd-input {
+    @apply bg-slate-900/80 border border-slate-700/60 rounded-lg text-sm text-white
+           px-3 py-1.5 h-9
+           focus:outline-none focus:border-sky-500/70 focus:ring-1 focus:ring-sky-500/20
+           placeholder:text-slate-500
+           transition-all duration-base;
+  }
+  .cmd-select {
+    @apply cmd-input appearance-none cursor-pointer pr-8;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+  }
+
+  /* ── Skeleton loading ────────────────────────────────────────────────── */
+  .skeleton {
+    @apply rounded bg-slate-800;
+    background: linear-gradient(90deg, #1e293b 0%, #293548 50%, #1e293b 100%);
+    background-size: 400px 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
+
+  /* ── Stagger entrance delay helpers ─────────────────────────────────── */
+  .stagger-1 { animation-delay: 0ms; }
+  .stagger-2 { animation-delay: 50ms; }
+  .stagger-3 { animation-delay: 100ms; }
+  .stagger-4 { animation-delay: 150ms; }
+  .stagger-5 { animation-delay: 200ms; }
+  .stagger-6 { animation-delay: 250ms; }
+
+  /* ── Role badge (sidebar bottom) ─────────────────────────────────────── */
+  .role-badge {
+    @apply flex items-center gap-2 px-3 py-2 rounded-lg
+           text-label-md uppercase tracking-wider
+           cursor-pointer transition-colors duration-base;
+  }
+  .role-badge-engineer  { @apply bg-sky-500/10 text-sky-400; }
+  .role-badge-manager   { @apply bg-violet-500/10 text-violet-400; }
+  .role-badge-executive { @apply bg-amber-500/10 text-amber-400; }
+
+  /* ── Data table ──────────────────────────────────────────────────────── */
+  .data-table {
+    @apply w-full text-body-sm;
+  }
+  .data-table thead tr {
+    @apply text-left text-label-sm uppercase text-slate-500 border-b border-slate-700/60;
+  }
+  .data-table thead th {
+    @apply p-2 font-semibold tracking-wider;
+  }
+  .data-table tbody tr {
+    @apply border-b border-slate-800/60 transition-colors hover:bg-slate-800/30;
+  }
+  .data-table tbody td {
+    @apply p-2 text-slate-300;
+  }
+  .data-table .td-mono {
+    @apply font-mono text-data-sm;
+  }
+  .data-table .td-highlight {
+    @apply text-white font-semibold;
+  }
+
+  /* ── Section header ──────────────────────────────────────────────────── */
+  .section-header {
+    @apply text-label-lg uppercase tracking-wider text-slate-400 mb-3;
+  }
+
+  /* ── Divider ─────────────────────────────────────────────────────────── */
+  .divider {
+    @apply border-t border-slate-800/60 my-4;
+  }
+
+  /* ── Tab bar ─────────────────────────────────────────────────────────── */
+  .tab-bar {
+    @apply flex gap-1 bg-slate-900/60 border border-slate-800/60 p-1 rounded-xl overflow-x-auto;
+  }
+  .tab-item {
+    @apply px-3.5 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap
+           transition-all duration-base cursor-pointer
+           text-slate-400 hover:text-slate-200 hover:bg-slate-800/60;
+    min-height: 36px;
+  }
+  .tab-item.active {
+    @apply bg-sky-500/15 text-sky-400;
+  }
+}
+
+/* ── Utility overrides ───────────────────────────────────────────────────── */
+@layer utilities {
+  /* Reduce motion: respect OS preference */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-up,
+    .animate-scale-in,
+    .animate-pulse-ring,
+    .animate-breathe,
+    .animate-shimmer,
+    .animate-scan-line {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+
+  /* Number display */
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+
+  /* Glow text helpers */
+  .text-glow-sky   { text-shadow: 0 0 12px rgba(56,189,248,0.6); }
+  .text-glow-alarm { text-shadow: 0 0 12px rgba(239,68,68,0.6); }
+  .text-glow-green { text-shadow: 0 0 12px rgba(34,197,94,0.6); }
+
+  /* Truncate with tooltip hint */
+  .truncate-hint { @apply truncate cursor-default; }
+
+  /* Full canvas height for page content */
+  .page-content {
+    @apply animate-fade-in;
   }
 }
