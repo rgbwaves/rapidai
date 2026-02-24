@@ -1,0 +1,421 @@
+openapi: 3.1.0
+info:
+  title: RAPID AI - Frozen API Contract (v1)
+  version: 1.0.0
+  description: >
+    Frozen API contract for RAPID AI Modules A–F plus B+ (Trend Intelligence) and
+    B++ (SEDL). This spec is designed to be used for FastAPI auto-generation and
+    to keep module interfaces stable while internal logic evolves.
+servers:
+  - url: https://rapid-ai-module-1.onrender.com
+    description: Render deployment (example)
+tags:
+  - name: module-a
+    description: Module A - Trend Analysis Engine (time-series analytics + rules)
+  - name: module-b
+    description: Module B - Initiator/Directional Ratio Engine (component-level)
+  - name: module-bplus
+    description: Module B+ - Trend Intelligence (slopes, slope-change, correlation)
+  - name: module-bpp
+    description: Module B++ - SEDL (Stability–Entropy Diagnostic Lens)
+  - name: module-c
+    description: Module C - Physics inference & structural context layer
+  - name: module-d
+    description: Module D - Fault synthesis & diagnostic layering
+  - name: module-e
+    description: Module E - Diagnosis-to-maintenance plan (prioritization)
+  - name: module-f
+    description: Module F - Reporting, auditability, and explainability objects
+
+paths:
+  /:
+    get:
+      tags: [module-a]
+      summary: Root health endpoint
+      responses:
+        "200":
+          description: Service banner
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+
+  /ping:
+    get:
+      tags: [module-a]
+      summary: Module A ping
+      responses:
+        "200":
+          description: Alive check
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PingResponse'
+
+  /analyze:
+    post:
+      tags: [module-a]
+      summary: Module A analyze (time-series trend analysis)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrendRequest'
+      responses:
+        "200":
+          description: Trend + fusion + fault summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModuleAResponse'
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /analyze_trend:
+    post:
+      tags: [module-a]
+      summary: Legacy convenience endpoint (velocity/H only)
+      description: >
+        Backward-compatible wrapper for older clients. Prefer /analyze for new work.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrendInputLegacy'
+      responses:
+        "200":
+          description: Trend + fusion + fault summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModuleAResponse'
+
+  /module2/ping:
+    get:
+      tags: [module-b]
+      summary: Module B ping (rules loaded)
+      responses:
+        "200":
+          description: Module B status + sheet inventory
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModuleBPing'
+
+  /module2/analyze_initiators:
+    post:
+      tags: [module-b]
+      summary: Module B initiator analysis (component sheet matching)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModuleBRequest'
+      responses:
+        "200":
+          description: Matching rules for the component + metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModuleBResponse'
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /bplus/analyze:
+    post:
+      tags: [module-bplus]
+      summary: Module B+ trend intelligence (slopes, slope-change, correlation)
+      description: >
+        Contract endpoint. Implementation may be phased in. Accepts precomputed
+        trends or time-series summaries.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModuleBPlusRequest'
+      responses:
+        "200":
+          description: Trend intelligence results with confidence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModuleBPlusResponse'
+
+  /bpp/sedl:
+    post:
+      tags: [module-bpp]
+      summary: Module B++ SEDL (Stability–Entropy Diagnostic Lens)
+      description: >
+        Contract endpoint for SEDL scoring: stability index, entropy index,
+        and interpretive state transitions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SEDLRequest'
+      responses:
+        "200":
+          description: SEDL indices + state + confidence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SEDLResponse'
+
+components:
+  schemas:
+    PingResponse:
+      type: object
+      properties:
+        status: { type: string, example: alive }
+        service: { type: string, example: RAPID AI Module 1 }
+
+    TrendRequest:
+      type: object
+      required: [machine_type, signal_type, values]
+      properties:
+        machine_id: { type: string, nullable: true }
+        machine_type: { type: string, example: pump }
+        location: { type: string, nullable: true }
+        signal_type: { type: string, example: velocity, description: velocity|acceleration|displacement }
+        direction: { type: string, default: H, example: H }
+        sampling_rate: { type: number, nullable: true, example: 2560 }
+        values:
+          type: array
+          items: { type: number }
+          description: Raw time-series samples
+
+    TrendInputLegacy:
+      type: object
+      required: [machine, values]
+      properties:
+        machine: { type: string, example: pump }
+        values:
+          type: array
+          items: { type: number }
+
+    TrendResult:
+      type: object
+      properties:
+        signal_type: { type: string }
+        direction: { type: string }
+        overall_rms: { type: number }
+        peak: { type: number }
+        kurtosis: { type: number }
+        crest_factor: { type: number }
+        baseline: { type: number, nullable: true }
+        ratio: { type: number, nullable: true }
+        severity_level: { type: string, example: normal }
+        severity_score: { type: number, example: 0.3 }
+        rule_id: { type: string, nullable: true }
+        rule_text: { type: string, nullable: true }
+        diagnosis: { type: string, nullable: true }
+        recommendations:
+          type: array
+          items: { type: string }
+
+    FusionResult:
+      type: object
+      properties:
+        fusion_index: { type: number }
+        fusion_level: { type: string }
+        components:
+          type: object
+          additionalProperties: { type: number }
+        top_findings:
+          type: array
+          items: { type: string }
+
+    FaultSummaryItem:
+      type: object
+      properties:
+        signal_group: { type: string }
+        severity_level: { type: string }
+        severity_score: { type: number }
+        diagnosis: { type: string, nullable: true }
+        recommendations:
+          type: array
+          items: { type: string }
+
+    ModuleAResponse:
+      type: object
+      properties:
+        trend_result: { $ref: '#/components/schemas/TrendResult' }
+        fusion_result: { $ref: '#/components/schemas/FusionResult' }
+        fault_summary:
+          type: array
+          items: { $ref: '#/components/schemas/FaultSummaryItem' }
+
+    ModuleBPing:
+      type: object
+      properties:
+        module2_status: { type: string, example: alive }
+        sheets_loaded: { type: integer, example: 12 }
+        sheet_names:
+          type: array
+          items: { type: string }
+
+    ModuleBRequest:
+      type: object
+      required: [component, metrics]
+      properties:
+        component:
+          type: string
+          description: Component sheet key (e.g., afb, journal, tpjb, coupling, gears)
+        metrics:
+          type: object
+          description: Numeric metrics (H,V,A,kurtosis,crest_factor,temperature,...)
+          additionalProperties:
+            oneOf:
+              - type: number
+              - type: string
+              - type: boolean
+
+    ModuleBTriggeredCondition:
+      type: object
+      properties:
+        expr: { type: string }
+        op: { type: string }
+        threshold: { type: number }
+        value: { type: number }
+
+    ModuleBMatch:
+      type: object
+      properties:
+        Rule_ID: { type: string }
+        Initiator: { type: string }
+        Diagnosis: { type: string }
+        Recommended_Actions: { type: string }
+        Severity_Logic: { type: string }
+        Physics_Basis: { type: string }
+        Detection_Rule: { type: string }
+        Triggered_Conditions:
+          type: array
+          items: { $ref: '#/components/schemas/ModuleBTriggeredCondition' }
+        Score: { type: number }
+
+    ModuleBResponse:
+      type: object
+      properties:
+        component: { type: string }
+        input_metrics:
+          type: object
+          additionalProperties: true
+        num_matches: { type: integer }
+        matched_rules:
+          type: array
+          items: { $ref: '#/components/schemas/ModuleBMatch' }
+
+    ModuleBPlusRequest:
+      type: object
+      required: [asset_id, features]
+      properties:
+        asset_id: { type: string }
+        timestamp_utc: { type: string, format: date-time }
+        window:
+          type: object
+          properties:
+            length: { type: integer, description: Number of samples in window }
+            unit: { type: string, enum: [samples, seconds, minutes, hours, days] }
+        features:
+          type: object
+          description: >
+            Precomputed time-series features or trend points. Keys examples:
+            overall_rms, 1x_amp, spike_energy, kurtosis, current, etc.
+          additionalProperties:
+            type: array
+            items: { type: number }
+
+    ModuleBPlusResponse:
+      type: object
+      properties:
+        asset_id: { type: string }
+        slope_table:
+          type: array
+          items:
+            type: object
+            properties:
+              feature: { type: string }
+              slope: { type: number }
+              slope_change: { type: number }
+              confidence: { type: number }
+        correlations:
+          type: array
+          items:
+            type: object
+            properties:
+              pair: { type: string, example: "1x_amp~spike_energy" }
+              r: { type: number }
+              lag: { type: integer, description: Lag in samples }
+              confidence: { type: number }
+        alarms:
+          type: array
+          items:
+            type: object
+            properties:
+              code: { type: string }
+              level: { type: string, enum: [info, watch, warning, alarm] }
+              reason: { type: string }
+              confidence: { type: number }
+
+    SEDLRequest:
+      type: object
+      required: [asset_id, state_vectors]
+      properties:
+        asset_id: { type: string }
+        timestamp_utc: { type: string, format: date-time }
+        state_vectors:
+          type: array
+          description: >
+            Sequence of state vectors (normalized). Each vector is a dict of
+            feature_name -> value.
+          items:
+            type: object
+            additionalProperties: { type: number }
+        config:
+          type: object
+          properties:
+            entropy_method: { type: string, enum: [shannon, renyi2, spectral], default: shannon }
+            stability_method: { type: string, enum: [lyapunov_proxy, variance_growth, markov], default: variance_growth }
+
+    SEDLResponse:
+      type: object
+      properties:
+        asset_id: { type: string }
+        stability_index: { type: number }
+        entropy_index: { type: number }
+        sedl_score: { type: number }
+        state: { type: string, enum: [stable, drifting, unstable, chaotic] }
+        confidence: { type: number }
+        notes:
+          type: array
+          items: { type: string }
+
+    ValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            properties:
+              type: { type: string }
+              loc:
+                type: array
+                items: { type: string }
+              msg: { type: string }
+              input: { nullable: true }

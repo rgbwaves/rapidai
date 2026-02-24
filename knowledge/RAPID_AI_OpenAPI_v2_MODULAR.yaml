@@ -1,0 +1,1113 @@
+openapi: 3.0.3
+info:
+  title: RAPID AI – Modular Reliability Intelligence API
+  version: "1.0.0"
+  description: >
+    Unified API contract for RAPID AI Modules 0–F and the State Machine Wrapper.
+    This spec is designed to be validation-ready and aligned with FastAPI/Pydantic models.
+
+servers:
+  - url: https://YOUR-RENDER-OR-DOMAIN-HERE
+    description: Production
+  - url: http://localhost:8000
+    description: Local dev
+
+tags:
+  - name: Module0
+    description: Data Guard – schema validation, unit normalization, DQ scoring.
+  - name: ModuleA
+    description: Trend Engine – numeric trend metrics & rule-based interpretation.
+  - name: ModuleB
+    description: Initiator Rules – component-level initiator detection.
+  - name: ModuleBPlus
+    description: Slope / Instability – windowed regression slopes + stability flags.
+  - name: ModuleBPP
+    description: SEDL – entropy/stability lens computed from vibration-only signals.
+  - name: ModuleC
+    description: Fusion / SSI – system-level stability index & contributors.
+  - name: ModuleD
+    description: Fault Mechanism – map initiators to mechanisms and hypotheses.
+  - name: ModuleE
+    description: Maintenance Plan – prioritize actions into an executable plan.
+  - name: ModuleF
+    description: Governance – audit, versioning, approvals, overrides, traceability.
+  - name: Wrapper
+    description: State Machine Wrapper – orchestrates modules 0–F.
+
+paths:
+  /:
+    get:
+      summary: Root health check
+      operationId: root
+      responses:
+        "200":
+          description: Service alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                required: [message]
+              examples:
+                ok:
+                  value: { "message": "RAPID AI Engine is running." }
+
+  /ping:
+    get:
+      tags: [ModuleA]
+      summary: Module A ping
+      operationId: moduleA_ping
+      responses:
+        "200":
+          description: Alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PingResponse"
+              examples:
+                ok:
+                  value: { "status": "alive", "service": "RAPID AI Module A" }
+
+  # -----------------------------
+  # MODULE 0 – DATA GUARD
+  # -----------------------------
+  /module0/ping:
+    get:
+      tags: [Module0]
+      summary: Module 0 ping
+      operationId: module0_ping
+      responses:
+        "200":
+          description: Alive
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModulePingResponse" }
+              examples:
+                ok:
+                  value: { "status": "alive", "module": "Module0", "details": {"rules_loaded": 0} }
+
+  /module0/validate:
+    post:
+      tags: [Module0]
+      summary: Validate + normalize incoming payload
+      operationId: module0_validate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Module0ValidateRequest" }
+            examples:
+              ex1:
+                value:
+                  schema_version: "1.0"
+                  asset_id: "P-101A"
+                  signal:
+                    signal_type: "velocity"
+                    direction: "H"
+                    unit: "mm/s"
+                    sampling_rate_hz: 2560
+                  context:
+                    rpm: 1480
+                    temperature_c: 58
+                  payload:
+                    features:
+                      overall_rms: 2.8
+                      peak: 4.0
+                      kurtosis: 1.68
+                      crest_factor: 1.42
+      responses:
+        "200":
+          description: Validation result + normalized payload + dq score
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Module0ValidateResponse" }
+
+  # -----------------------------
+  # MODULE A – TREND ENGINE
+  # -----------------------------
+  /analyze:
+    post:
+      tags: [ModuleA]
+      summary: Analyze a single signal (Module A)
+      operationId: moduleA_analyze
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TrendRequest" }
+            examples:
+              ex1:
+                value:
+                  machine_type: "pump"
+                  signal_type: "velocity"
+                  direction: "H"
+                  values: [2.1, 2.2, 2.4, 2.6, 2.8]
+                  baseline: 2.0
+      responses:
+        "200":
+          description: Trend + Fusion + Fault Summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnalyzeResponse" }
+
+  /analyze_trend:
+    post:
+      tags: [ModuleA]
+      summary: Convenience endpoint (velocity/H default)
+      operationId: moduleA_analyze_trend
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TrendInput" }
+      responses:
+        "200":
+          description: Trend + Fusion + Fault Summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnalyzeResponse" }
+
+  # -----------------------------
+  # MODULE B – INITIATOR RULES
+  # -----------------------------
+  /moduleB/ping:
+    get:
+      tags: [ModuleB]
+      summary: Module B ping
+      operationId: moduleB_ping
+      responses:
+        "200":
+          description: Alive
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleBPingResponse" }
+              examples:
+                ok:
+                  value:
+                    module_status: "alive"
+                    sheets_loaded: 12
+                    sheet_names: ["afb","journal","tpjb","coupling","ac_motor","dc_motor","foundation","gears","fluid_flow","belts","chains","shafts"]
+
+  /moduleB/analyze_initiators:
+    post:
+      tags: [ModuleB]
+      summary: Evaluate initiator rules for a component
+      operationId: moduleB_analyze_initiators
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ModuleBInitiatorRequest" }
+            examples:
+              afb:
+                value:
+                  asset_id: "P-101A"
+                  component: "afb"
+                  metrics:
+                    H: 2.4
+                    V: 2.0
+                    A: 0.2
+                    kurtosis: 2.5
+                    crest_factor: 2.8
+                    temperature: 55
+      responses:
+        "200":
+          description: Matched rules and scores
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleBInitiatorResponse" }
+
+  # -----------------------------
+  # MODULE B+ – SLOPE / INSTABILITY
+  # -----------------------------
+  /moduleBplus/ping:
+    get:
+      tags: [ModuleBPlus]
+      summary: Module B+ ping
+      operationId: moduleBplus_ping
+      responses:
+        "200":
+          description: Alive
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModulePingResponse" }
+              examples:
+                ok:
+                  value: { "status": "alive", "module": "ModuleBPlus", "details": {"profiles_loaded": 1} }
+
+  /moduleBplus/evaluate:
+    post:
+      tags: [ModuleBPlus]
+      summary: Compute windowed slope + slope-change + stability flags
+      operationId: moduleBplus_evaluate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BPlusEvaluateRequest" }
+            examples:
+              ex1:
+                value:
+                  asset_id: "P-101A"
+                  component: "journal"
+                  primary_signal: "VEL_RMS"
+                  slope_method: "log_regression"
+                  window:
+                    window_len_points: 60
+                    overlap_pct: 50
+                  series:
+                    timestamps: ["2026-02-18T10:00:00Z","2026-02-18T10:01:00Z","2026-02-18T10:02:00Z"]
+                    values: [2.1, 2.15, 2.25]
+                  prev_slope_value: 0.0021
+      responses:
+        "200":
+          description: Slope output record
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BPlusEvaluateResponse" }
+
+  # -----------------------------
+  # MODULE B++ – SEDL (ENTROPY / STABILITY)
+  # -----------------------------
+  /moduleBpp/ping:
+    get:
+      tags: [ModuleBPP]
+      summary: Module B++ ping
+      operationId: moduleBpp_ping
+      responses:
+        "200":
+          description: Alive
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModulePingResponse" }
+              examples:
+                ok:
+                  value: { "status": "alive", "module": "ModuleBPP", "details": {"thresholds_loaded": 6, "state_rules_loaded": 5} }
+
+  /moduleBpp/evaluate:
+    post:
+      tags: [ModuleBPP]
+      summary: Evaluate SEDL stability state (entropy lens)
+      operationId: moduleBpp_evaluate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BPPEvaluateRequest" }
+            examples:
+              metrics_only:
+                value:
+                  asset_id: "P-101A"
+                  window_days: 7
+                  metrics:
+                    SE: 0.62
+                    TE: 0.55
+                    DE: 0.50
+                    dSE_dt: 0.03
+      responses:
+        "200":
+          description: SEDL scores and state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BPPEvaluateResponse" }
+
+  # -----------------------------
+  # MODULE C – FUSION / SSI
+  # -----------------------------
+  /moduleC/ping:
+    get:
+      tags: [ModuleC]
+      summary: Module C ping
+      operationId: moduleC_ping
+      responses:
+        "200":
+          description: Alive
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModulePingResponse" }
+
+  /moduleC/evaluate:
+    post:
+      tags: [ModuleC]
+      summary: Compute SSI and System State
+      operationId: moduleC_evaluate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ModuleCEvaluateRequest" }
+            examples:
+              pump_train:
+                value:
+                  asset_id: "P-101A"
+                  system_type: "pump_train_horizontal"
+                  profile_id: "PROFILE_PUMP_A"
+                  blocks:
+                    - block: "foundation"
+                      B_match_score: 0.10
+                      Bplus_trend_class: "Stable"
+                      Bplus_confidence: 0.60
+                      process_correlation: 0.20
+                    - block: "fluid_flow"
+                      B_match_score: 0.80
+                      Bplus_trend_class: "Accelerating"
+                      Bplus_confidence: 0.75
+                      process_correlation: 0.40
+                  bpp:
+                    SI: 0.52
+                    stability_state: "Destabilizing"
+                    severity_level: "warning"
+      responses:
+        "200":
+          description: SSI output
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleCEvaluateResponse" }
+
+  # -----------------------------
+  # MODULE D – FAULT MECHANISM (SCHEMA)
+  # -----------------------------
+  /moduleD/ping:
+    get:
+      tags: [ModuleD]
+      summary: Module D ping
+      operationId: moduleD_ping
+      responses:
+        "200":
+          description: Alive
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModulePingResponse" }
+
+  /moduleD/evaluate:
+    post:
+      tags: [ModuleD]
+      summary: Map initiators + SSI to fault mechanism hypotheses
+      operationId: moduleD_evaluate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ModuleDEvaluateRequest" }
+            examples:
+              ex1:
+                value:
+                  asset_id: "P-101A"
+                  system_state: "warning"
+                  top_initiators:
+                    - component: "afb"
+                      rule_id: "AFB06"
+                      score: 0.82
+                      diagnosis: "imbalance affecting bearing"
+                  context:
+                    rpm: 1480
+                    temperature_c: 58
+      responses:
+        "200":
+          description: Mechanism hypotheses
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleDEvaluateResponse" }
+
+  # -----------------------------
+  # MODULE E – MAINTENANCE PLAN (SCHEMA)
+  # -----------------------------
+  /moduleE/ping:
+    get:
+      tags: [ModuleE]
+      summary: Module E ping
+      operationId: moduleE_ping
+      responses:
+        "200":
+          description: Alive
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModulePingResponse" }
+
+  /moduleE/plan:
+    post:
+      tags: [ModuleE]
+      summary: Convert diagnosis into prioritized maintenance plan
+      operationId: moduleE_plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ModuleEPlanRequest" }
+            examples:
+              ex1:
+                value:
+                  asset_id: "P-101A"
+                  severity_level: "warning"
+                  findings:
+                    - source_module: "ModuleB"
+                      component: "afb"
+                      diagnosis: "imbalance affecting bearing"
+                      recommended_actions: ["Dynamic balance rotor", "Inspect deposits/fouling"]
+                      confidence: 0.82
+                    - source_module: "ModuleD"
+                      component: "shaft"
+                      diagnosis: "running near critical speed"
+                      recommended_actions: ["Change speed", "Add damping"]
+                      confidence: 0.65
+      responses:
+        "200":
+          description: Prioritized plan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleEPlanResponse" }
+
+  # -----------------------------
+  # MODULE F – GOVERNANCE (SCHEMA)
+  # -----------------------------
+  /moduleF/ping:
+    get:
+      tags: [ModuleF]
+      summary: Module F ping
+      operationId: moduleF_ping
+      responses:
+        "200":
+          description: Alive
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModulePingResponse" }
+
+  /moduleF/audit_event:
+    post:
+      tags: [ModuleF]
+      summary: Store an audit event for traceability
+      operationId: moduleF_audit_event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ModuleFAuditEventRequest" }
+            examples:
+              ex1:
+                value:
+                  asset_id: "P-101A"
+                  event_type: "analysis_run"
+                  actor: "edge_service"
+                  timestamp: "2026-02-24T18:45:00Z"
+                  module_versions:
+                    module0: "1.0.0"
+                    moduleA: "1.0.0"
+                    moduleB: "1.0.0"
+                    moduleBplus: "1.0.0"
+                    moduleBpp: "1.0.0"
+                    moduleC: "1.0.0"
+                  request_id: "req-8f3c2a"
+                  notes: "Completed scheduled analysis"
+      responses:
+        "200":
+          description: Stored
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModuleFAuditEventResponse" }
+
+  # -----------------------------
+  # WRAPPER – ORCHESTRATION
+  # -----------------------------
+  /wrapper/run:
+    post:
+      tags: [Wrapper]
+      summary: Run orchestration pipeline (0→F) for a single asset window
+      operationId: wrapper_run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WrapperRunRequest" }
+            examples:
+              ex1:
+                value:
+                  schema_version: "1.0"
+                  asset_id: "P-101A"
+                  system_type: "pump_train_horizontal"
+                  inputs:
+                    signal:
+                      signal_type: "velocity"
+                      direction: "H"
+                      unit: "mm/s"
+                      sampling_rate_hz: 2560
+                    features:
+                      overall_rms: 2.8
+                      peak: 4.0
+                      kurtosis: 6.2
+                      crest_factor: 3.1
+                      hf_band_5_9khz: 2.2
+                    context:
+                      rpm: 1480
+                      temperature_c: 58
+      responses:
+        "200":
+          description: Unified output bundle
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WrapperRunResponse" }
+
+components:
+  schemas:
+    # ---------------------------
+    # COMMON
+    # ---------------------------
+    PingResponse:
+      type: object
+      properties:
+        status: { type: string, enum: ["alive","error"] }
+        service: { type: string }
+      required: [status, service]
+
+    ModulePingResponse:
+      type: object
+      properties:
+        status: { type: string, enum: ["alive","error"] }
+        module: { type: string }
+        details:
+          type: object
+          additionalProperties: true
+      required: [status, module]
+
+    SeverityLevel:
+      type: string
+      enum: ["normal","watch","warning","alarm"]
+
+    # ---------------------------
+    # MODULE 0
+    # ---------------------------
+    SignalDescriptor:
+      type: object
+      properties:
+        signal_type:
+          type: string
+          enum: ["velocity","acceleration","displacement","current","temperature","other"]
+        direction:
+          type: string
+          enum: ["H","V","A","R","T","X","Y","Z"]
+        unit: { type: string, example: "mm/s" }
+        sampling_rate_hz: { type: integer, minimum: 1, example: 2560 }
+      required: [signal_type, direction, unit, sampling_rate_hz]
+
+    Module0Context:
+      type: object
+      properties:
+        rpm: { type: number, nullable: true, example: 1480 }
+        temperature_c: { type: number, nullable: true, example: 58 }
+      additionalProperties: true
+
+    Module0Payload:
+      type: object
+      properties:
+        features:
+          type: object
+          additionalProperties: true
+        waveform_b64:
+          type: string
+          nullable: true
+          description: Optional base64 waveform (if ever enabled)
+      required: [features]
+
+    Module0ValidateRequest:
+      type: object
+      properties:
+        schema_version: { type: string, example: "1.0" }
+        asset_id: { type: string, example: "P-101A" }
+        signal: { $ref: "#/components/schemas/SignalDescriptor" }
+        context: { $ref: "#/components/schemas/Module0Context" }
+        payload: { $ref: "#/components/schemas/Module0Payload" }
+      required: [schema_version, asset_id, signal, payload]
+
+    Module0ValidateResponse:
+      type: object
+      properties:
+        asset_id: { type: string }
+        valid: { type: boolean }
+        errors:
+          type: array
+          items: { type: string }
+        normalized:
+          type: object
+          description: Normalized payload (units, keys)
+          additionalProperties: true
+        dq_score:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Data quality score
+      required: [asset_id, valid, errors, normalized, dq_score]
+
+    # ---------------------------
+    # MODULE A (FastAPI-aligned)
+    # ---------------------------
+    TrendRequest:
+      type: object
+      properties:
+        machine_type: { type: string, example: "pump" }
+        signal_type: { type: string, enum: ["velocity","acceleration","displacement"] }
+        direction: { type: string, enum: ["H","V","A"] }
+        values:
+          type: array
+          items: { type: number }
+          minItems: 3
+        baseline:
+          type: number
+          nullable: true
+          description: Optional baseline for ratio scoring
+      required: [machine_type, signal_type, direction, values]
+
+    TrendResult:
+      type: object
+      properties:
+        signal_type: { type: string }
+        direction: { type: string }
+        overall_rms: { type: number }
+        peak: { type: number }
+        kurtosis: { type: number }
+        crest_factor: { type: number }
+        baseline: { type: number, nullable: true }
+        ratio: { type: number, nullable: true }
+        severity_level: { $ref: "#/components/schemas/SeverityLevel" }
+        severity_score: { type: number, minimum: 0, maximum: 1 }
+        rule_id: { type: string, nullable: true }
+        rule_text: { type: string, nullable: true }
+        diagnosis: { type: string, nullable: true }
+        recommendations:
+          type: array
+          items: { type: string }
+      required: [signal_type, direction, overall_rms, peak, kurtosis, crest_factor, severity_level, severity_score, recommendations]
+
+    FusionResult:
+      type: object
+      properties:
+        fusion_index: { type: number, minimum: 0, maximum: 1 }
+        fusion_level: { $ref: "#/components/schemas/SeverityLevel" }
+        components:
+          type: object
+          additionalProperties: { type: number }
+        top_findings:
+          type: array
+          items: { type: string }
+      required: [fusion_index, fusion_level, components, top_findings]
+
+    FaultSummaryItem:
+      type: object
+      properties:
+        signal_group: { type: string }
+        severity_level: { $ref: "#/components/schemas/SeverityLevel" }
+        severity_score: { type: number, minimum: 0, maximum: 1 }
+        diagnosis: { type: string }
+        recommendations:
+          type: array
+          items: { type: string }
+      required: [signal_group, severity_level, severity_score, diagnosis, recommendations]
+
+    AnalyzeResponse:
+      type: object
+      properties:
+        trend_result: { $ref: "#/components/schemas/TrendResult" }
+        fusion_result: { $ref: "#/components/schemas/FusionResult" }
+        fault_summary:
+          type: array
+          items: { $ref: "#/components/schemas/FaultSummaryItem" }
+      required: [trend_result, fusion_result, fault_summary]
+
+    TrendInput:
+      type: object
+      properties:
+        machine: { type: string }
+        values:
+          type: array
+          items: { type: number }
+      required: [machine, values]
+
+    # ---------------------------
+    # MODULE B (FastAPI-aligned to current /module2/analyze_initiators usage)
+    # ---------------------------
+    ComponentName:
+      type: string
+      enum: ["afb","journal","tpjb","coupling","ac_motor","dc_motor","foundation","gears","fluid_flow","belts","chains","shafts"]
+
+    ModuleBInitiatorRequest:
+      type: object
+      properties:
+        asset_id: { type: string, nullable: true }
+        component: { $ref: "#/components/schemas/ComponentName" }
+        metrics:
+          type: object
+          properties:
+            H: { type: number }
+            V: { type: number }
+            A: { type: number }
+          additionalProperties: true
+          required: [H, V, A]
+      required: [component, metrics]
+
+    TriggeredCondition:
+      type: object
+      properties:
+        expr: { type: string }
+        op: { type: string, enum: [">",">=","<","<=","==","="] }
+        threshold: { type: number }
+        value: { type: number }
+      required: [expr, op, threshold, value]
+
+    MatchedRule:
+      type: object
+      properties:
+        Rule_ID: { type: string }
+        Initiator: { type: string }
+        Diagnosis: { type: string }
+        Recommended_Actions: { type: string }
+        Severity_Logic: { type: string }
+        Physics_Basis: { type: string }
+        Detection_Rule: { type: string }
+        Triggered_Conditions:
+          type: array
+          items: { $ref: "#/components/schemas/TriggeredCondition" }
+        Score: { type: number, minimum: 0 }
+      required: [Rule_ID, Initiator, Diagnosis, Recommended_Actions, Detection_Rule, Triggered_Conditions, Score]
+
+    ModuleBInitiatorResponse:
+      type: object
+      properties:
+        component: { $ref: "#/components/schemas/ComponentName" }
+        input_metrics:
+          type: object
+          additionalProperties: true
+        num_matches: { type: integer, minimum: 0 }
+        matched_rules:
+          type: array
+          items: { $ref: "#/components/schemas/MatchedRule" }
+      required: [component, input_metrics, num_matches, matched_rules]
+
+    ModuleBPingResponse:
+      type: object
+      properties:
+        module_status: { type: string, enum: ["alive","error"] }
+        sheets_loaded: { type: integer }
+        sheet_names:
+          type: array
+          items: { type: string }
+      required: [module_status, sheets_loaded, sheet_names]
+
+    # ---------------------------
+    # MODULE B+
+    # ---------------------------
+    SlopeMethod:
+      type: string
+      enum: ["linear_regression","log_regression"]
+
+    BPlusWindowConfig:
+      type: object
+      properties:
+        window_len_points: { type: integer, minimum: 3 }
+        overlap_pct: { type: number, minimum: 0, maximum: 95, nullable: true }
+      required: [window_len_points]
+
+    BPlusSeries:
+      type: object
+      properties:
+        timestamps:
+          type: array
+          items: { type: string, format: date-time }
+          minItems: 3
+        values:
+          type: array
+          items: { type: number }
+          minItems: 3
+      required: [timestamps, values]
+
+    BPlusEvaluateRequest:
+      type: object
+      properties:
+        asset_id: { type: string }
+        component: { $ref: "#/components/schemas/ComponentName" }
+        primary_signal: { type: string, example: "VEL_RMS" }
+        slope_method: { $ref: "#/components/schemas/SlopeMethod" }
+        window: { $ref: "#/components/schemas/BPlusWindowConfig" }
+        series: { $ref: "#/components/schemas/BPlusSeries" }
+        prev_slope_value:
+          type: number
+          nullable: true
+          description: Previous window slope_value (nullable for first window)
+      required: [asset_id, component, primary_signal, slope_method, window, series]
+
+    TrendClass:
+      type: string
+      enum: ["Stable","Drift","Accelerating","Step","Chaotic"]
+
+    StabilityClass:
+      type: string
+      enum: ["stable","marginal","unstable"]
+
+    BPlusEvaluateResponse:
+      type: object
+      properties:
+        asset_id: { type: string }
+        component: { $ref: "#/components/schemas/ComponentName" }
+        primary_signal: { type: string }
+        slope_method: { $ref: "#/components/schemas/SlopeMethod" }
+        window_len_points: { type: integer }
+        window_start_ts: { type: string, format: date-time }
+        window_end_ts: { type: string, format: date-time }
+        slope_value: { type: number }
+        slope_abs: { type: number }
+        slope_sign: { type: string, enum: ["positive","negative","zero"] }
+        slope_change_value:
+          type: number
+          nullable: true
+          description: slope_value(t) - slope_value(t-1); nullable for first window
+        trend_class: { $ref: "#/components/schemas/TrendClass" }
+        stability_class: { $ref: "#/components/schemas/StabilityClass" }
+        acceleration_flag: { type: boolean }
+        confidence_weight: { type: number, minimum: 0, maximum: 1 }
+      required:
+        [asset_id, component, primary_signal, slope_method, window_len_points, window_start_ts, window_end_ts,
+         slope_value, slope_abs, slope_sign, trend_class, stability_class, acceleration_flag, confidence_weight]
+
+    # ---------------------------
+    # MODULE B++
+    # ---------------------------
+    BPPEvaluateRequest:
+      type: object
+      properties:
+        asset_id: { type: string }
+        window_days: { type: integer, minimum: 1, nullable: true }
+        metrics:
+          type: object
+          properties:
+            SE: { type: number, minimum: 0, maximum: 1 }
+            TE: { type: number, minimum: 0, maximum: 1 }
+            DE: { type: number, minimum: 0, maximum: 1, nullable: true }
+            dSE_dt: { type: number, nullable: true }
+          required: [SE, TE]
+          additionalProperties: false
+      required: [asset_id, metrics]
+
+    StabilityState:
+      type: string
+      enum: ["Stable","Drifting","Destabilizing","Chaotic","Critical_Instability"]
+
+    BPPEvaluateResponse:
+      type: object
+      properties:
+        asset_id: { type: string }
+        SE: { type: number }
+        TE: { type: number }
+        DE: { type: number, nullable: true }
+        dSE_dt: { type: number, nullable: true }
+        SI: { type: number, minimum: 0, maximum: 1 }
+        stability_state: { $ref: "#/components/schemas/StabilityState" }
+        severity_level: { $ref: "#/components/schemas/SeverityLevel" }
+        triggered_rules:
+          type: array
+          items:
+            type: object
+            properties:
+              rule_id: { type: string }
+              condition: { type: string }
+              matched: { type: boolean }
+            required: [rule_id, condition, matched]
+      required: [asset_id, SE, TE, SI, stability_state, severity_level, triggered_rules]
+
+    # ---------------------------
+    # MODULE C
+    # ---------------------------
+    ModuleCBlockInput:
+      type: object
+      properties:
+        block: { $ref: "#/components/schemas/ComponentName" }
+        B_match_score: { type: number, minimum: 0, maximum: 1 }
+        Bplus_trend_class: { $ref: "#/components/schemas/TrendClass" }
+        Bplus_confidence: { type: number, minimum: 0, maximum: 1 }
+        process_correlation: { type: number, minimum: 0, maximum: 1, nullable: true }
+      required: [block, B_match_score, Bplus_trend_class, Bplus_confidence]
+
+    ModuleCBPPInput:
+      type: object
+      properties:
+        SI: { type: number, minimum: 0, maximum: 1 }
+        stability_state: { $ref: "#/components/schemas/StabilityState" }
+        severity_level: { $ref: "#/components/schemas/SeverityLevel" }
+      required: [SI, stability_state, severity_level]
+
+    ModuleCEvaluateRequest:
+      type: object
+      properties:
+        asset_id: { type: string }
+        system_type: { type: string }
+        profile_id: { type: string, nullable: true }
+        blocks:
+          type: array
+          items: { $ref: "#/components/schemas/ModuleCBlockInput" }
+          minItems: 1
+        bpp:
+          $ref: "#/components/schemas/ModuleCBPPInput"
+      required: [asset_id, system_type, blocks, bpp]
+
+    ModuleCEvaluateResponse:
+      type: object
+      properties:
+        asset_id: { type: string }
+        SSI: { type: number, minimum: 0, maximum: 1 }
+        system_state: { $ref: "#/components/schemas/SeverityLevel" }
+        top_contributors:
+          type: array
+          items:
+            type: object
+            properties:
+              block: { type: string }
+              contribution: { type: number }
+              block_state: { type: string }
+            required: [block, contribution, block_state]
+        recommended_action: { type: string }
+      required: [asset_id, SSI, system_state, top_contributors, recommended_action]
+
+    # ---------------------------
+    # MODULE D
+    # ---------------------------
+    ModuleDEvaluateRequest:
+      type: object
+      properties:
+        asset_id: { type: string }
+        system_state: { $ref: "#/components/schemas/SeverityLevel" }
+        top_initiators:
+          type: array
+          items:
+            type: object
+            properties:
+              component: { $ref: "#/components/schemas/ComponentName" }
+              rule_id: { type: string }
+              score: { type: number, minimum: 0, maximum: 1 }
+              diagnosis: { type: string }
+            required: [component, rule_id, score, diagnosis]
+        context:
+          type: object
+          additionalProperties: true
+      required: [asset_id, system_state, top_initiators]
+
+    ModuleDEvaluateResponse:
+      type: object
+      properties:
+        asset_id: { type: string }
+        hypotheses:
+          type: array
+          items:
+            type: object
+            properties:
+              mechanism_id: { type: string }
+              title: { type: string }
+              confidence: { type: number, minimum: 0, maximum: 1 }
+              evidence:
+                type: array
+                items: { type: string }
+              next_checks:
+                type: array
+                items: { type: string }
+            required: [mechanism_id, title, confidence, evidence, next_checks]
+      required: [asset_id, hypotheses]
+
+    # ---------------------------
+    # MODULE E
+    # ---------------------------
+    ModuleEPlanRequest:
+      type: object
+      properties:
+        asset_id: { type: string }
+        severity_level: { $ref: "#/components/schemas/SeverityLevel" }
+        findings:
+          type: array
+          items:
+            type: object
+            properties:
+              source_module: { type: string, enum: ["ModuleB","ModuleBPlus","ModuleBPP","ModuleC","ModuleD"] }
+              component: { $ref: "#/components/schemas/ComponentName" }
+              diagnosis: { type: string }
+              recommended_actions:
+                type: array
+                items: { type: string }
+              confidence: { type: number, minimum: 0, maximum: 1, nullable: true }
+            required: [source_module, component, diagnosis, recommended_actions]
+      required: [asset_id, severity_level, findings]
+
+    ModuleEPlanResponse:
+      type: object
+      properties:
+        asset_id: { type: string }
+        plan:
+          type: array
+          items:
+            type: object
+            properties:
+              priority: { type: integer, minimum: 1 }
+              action: { type: string }
+              owner_role: { type: string, nullable: true }
+              due_in_hours: { type: integer, nullable: true }
+              rationale: { type: string }
+              linked_findings:
+                type: array
+                items: { type: string }
+            required: [priority, action, rationale, linked_findings]
+      required: [asset_id, plan]
+
+    # ---------------------------
+    # MODULE F
+    # ---------------------------
+    ModuleFAuditEventRequest:
+      type: object
+      properties:
+        asset_id: { type: string }
+        event_type: { type: string, enum: ["analysis_run","config_change","override","deployment","incident"] }
+        actor: { type: string }
+        timestamp: { type: string, format: date-time }
+        module_versions:
+          type: object
+          additionalProperties: { type: string }
+        request_id: { type: string }
+        notes: { type: string, nullable: true }
+      required: [asset_id, event_type, actor, timestamp, module_versions, request_id]
+
+    ModuleFAuditEventResponse:
+      type: object
+      properties:
+        stored: { type: boolean }
+        audit_id: { type: string }
+      required: [stored, audit_id]
+
+    # ---------------------------
+    # WRAPPER
+    # ---------------------------
+    WrapperInputs:
+      type: object
+      properties:
+        signal: { $ref: "#/components/schemas/SignalDescriptor" }
+        features:
+          type: object
+          additionalProperties: true
+        context: { $ref: "#/components/schemas/Module0Context" }
+      required: [signal, features]
+
+    WrapperRunRequest:
+      type: object
+      properties:
+        schema_version: { type: string }
+        asset_id: { type: string }
+        system_type: { type: string }
+        inputs: { $ref: "#/components/schemas/WrapperInputs" }
+      required: [schema_version, asset_id, system_type, inputs]
+
+    WrapperRunResponse:
+      type: object
+      properties:
+        asset_id: { type: string }
+        module0: { type: object, additionalProperties: true }
+        moduleA: { type: object, additionalProperties: true }
+        moduleB: { type: object, additionalProperties: true }
+        moduleBplus: { type: object, additionalProperties: true }
+        moduleBpp: { type: object, additionalProperties: true }
+        moduleC: { type: object, additionalProperties: true }
+        moduleD: { type: object, additionalProperties: true }
+        moduleE: { type: object, additionalProperties: true }
+        moduleF: { type: object, additionalProperties: true }
+      required: [asset_id, module0, moduleA, moduleB, moduleBplus, moduleBpp, moduleC, moduleD, moduleE, moduleF]

@@ -1,0 +1,345 @@
+openapi: 3.0.3
+info:
+  title: RAPID AI – Production-Aligned OpenAPI Contract
+  version: "1.1.0"
+  description: >
+    Production-aligned API spec matching actual FastAPI route names.
+    This file is drop-in compatible with app.openapi() validation.
+
+servers:
+  - url: http://localhost:8000
+    description: Local Development
+  - url: https://your-production-domain.com
+    description: Production
+
+paths:
+
+  /:
+    get:
+      summary: Root health check
+      operationId: root
+      responses:
+        "200":
+          description: Service alive
+
+  # ---------------- MODULE A ----------------
+  /analyze:
+    post:
+      summary: Module A – Full analysis (Trend + Fusion + Fault Summary)
+      operationId: analyze_full
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrendRequest"
+      responses:
+        "200":
+          description: Module A output
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyzeResponse"
+
+  /analyze_trend:
+    post:
+      summary: Module A – Trend-only shortcut
+      operationId: analyze_trend
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrendInput"
+      responses:
+        "200":
+          description: Trend output
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyzeResponse"
+
+  # ---------------- MODULE B ----------------
+  /module2/ping:
+    get:
+      summary: Module B health check
+      operationId: module2_ping
+      responses:
+        "200":
+          description: Module B alive
+
+  /module2/analyze_initiators:
+    post:
+      summary: Module B – Initiator analysis
+      operationId: module2_analyze_initiators
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModuleBInitiatorRequest"
+      responses:
+        "200":
+          description: Initiator results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleBInitiatorResponse"
+
+  # ---------------- MODULE B+ ----------------
+  /moduleBplus/evaluate:
+    post:
+      summary: Module B+ – Slope & Instability
+      operationId: moduleBplus_evaluate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BPlusEvaluateRequest"
+      responses:
+        "200":
+          description: B+ results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BPlusEvaluateResponse"
+
+  # ---------------- MODULE B++ ----------------
+  /moduleBpp/evaluate:
+    post:
+      summary: Module B++ – SEDL Entropy Evaluation
+      operationId: moduleBpp_evaluate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BPPEvaluateRequest"
+      responses:
+        "200":
+          description: B++ results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BPPEvaluateResponse"
+
+  # ---------------- MODULE C ----------------
+  /moduleC/evaluate:
+    post:
+      summary: Module C – System Stability Index (SSI)
+      operationId: moduleC_evaluate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModuleCEvaluateRequest"
+      responses:
+        "200":
+          description: SSI results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleCEvaluateResponse"
+
+  # ---------------- MODULE D ----------------
+  /moduleD/evaluate:
+    post:
+      summary: Module D – Fault Mechanism Mapping
+      operationId: moduleD_evaluate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModuleDEvaluateRequest"
+      responses:
+        "200":
+          description: Fault hypotheses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleDEvaluateResponse"
+
+  # ---------------- MODULE E ----------------
+  /moduleE/plan:
+    post:
+      summary: Module E – Maintenance Plan Generator
+      operationId: moduleE_plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModuleEPlanRequest"
+      responses:
+        "200":
+          description: Prioritized maintenance plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleEPlanResponse"
+
+  # ---------------- MODULE F ----------------
+  /moduleF/audit_event:
+    post:
+      summary: Module F – Governance / Audit Logging
+      operationId: moduleF_audit_event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModuleFAuditEventRequest"
+      responses:
+        "200":
+          description: Audit stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleFAuditEventResponse"
+
+components:
+  schemas:
+
+    TrendRequest:
+      type: object
+      properties:
+        machine_type: { type: string }
+        signal_type: { type: string }
+        direction: { type: string }
+        values:
+          type: array
+          items: { type: number }
+        baseline: { type: number, nullable: true }
+      required: [machine_type, signal_type, direction, values]
+
+    TrendInput:
+      type: object
+      properties:
+        machine: { type: string }
+        values:
+          type: array
+          items: { type: number }
+      required: [machine, values]
+
+    AnalyzeResponse:
+      type: object
+      properties:
+        trend_result: { type: object }
+        fusion_result: { type: object }
+        fault_summary:
+          type: array
+          items: { type: object }
+
+    ModuleBInitiatorRequest:
+      type: object
+      properties:
+        component: { type: string }
+        metrics: { type: object }
+      required: [component, metrics]
+
+    ModuleBInitiatorResponse:
+      type: object
+      properties:
+        component: { type: string }
+        num_matches: { type: integer }
+        matched_rules:
+          type: array
+          items: { type: object }
+
+    BPlusEvaluateRequest:
+      type: object
+      properties:
+        asset_id: { type: string }
+        component: { type: string }
+        primary_signal: { type: string }
+        slope_method: { type: string }
+        window: { type: object }
+        series: { type: object }
+      required: [asset_id, component, primary_signal, slope_method, window, series]
+
+    BPlusEvaluateResponse:
+      type: object
+      properties:
+        asset_id: { type: string }
+        slope_value: { type: number }
+        trend_class: { type: string }
+
+    BPPEvaluateRequest:
+      type: object
+      properties:
+        asset_id: { type: string }
+        metrics: { type: object }
+      required: [asset_id, metrics]
+
+    BPPEvaluateResponse:
+      type: object
+      properties:
+        asset_id: { type: string }
+        SI: { type: number }
+        stability_state: { type: string }
+
+    ModuleCEvaluateRequest:
+      type: object
+      properties:
+        asset_id: { type: string }
+        blocks:
+          type: array
+          items: { type: object }
+      required: [asset_id, blocks]
+
+    ModuleCEvaluateResponse:
+      type: object
+      properties:
+        asset_id: { type: string }
+        SSI: { type: number }
+
+    ModuleDEvaluateRequest:
+      type: object
+      properties:
+        asset_id: { type: string }
+        top_initiators:
+          type: array
+          items: { type: object }
+      required: [asset_id, top_initiators]
+
+    ModuleDEvaluateResponse:
+      type: object
+      properties:
+        asset_id: { type: string }
+        hypotheses:
+          type: array
+          items: { type: object }
+
+    ModuleEPlanRequest:
+      type: object
+      properties:
+        asset_id: { type: string }
+        findings:
+          type: array
+          items: { type: object }
+      required: [asset_id, findings]
+
+    ModuleEPlanResponse:
+      type: object
+      properties:
+        asset_id: { type: string }
+        plan:
+          type: array
+          items: { type: object }
+
+    ModuleFAuditEventRequest:
+      type: object
+      properties:
+        asset_id: { type: string }
+        event_type: { type: string }
+        actor: { type: string }
+        timestamp: { type: string }
+      required: [asset_id, event_type, actor, timestamp]
+
+    ModuleFAuditEventResponse:
+      type: object
+      properties:
+        stored: { type: boolean }

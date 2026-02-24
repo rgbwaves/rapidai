@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-normal: #22c55e;
+    --color-watch: #eab308;
+    --color-warning: #f97316;
+    --color-alarm: #ef4444;
+  }
+
+  body {
+    @apply bg-slate-950 text-slate-200;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-slate-900;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-700 rounded-full;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-slate-800/80 border border-slate-700/50 rounded-xl p-4 backdrop-blur-sm;
+  }
+  .card-title {
+    @apply text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2;
+  }
+  .gauge-ring {
+    fill: none;
+    stroke-linecap: round;
+  }
+}
