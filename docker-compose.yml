@@ -14,6 +14,9 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    networks:
+      - default
+      - coolify
 
   dashboard:
     build:
@@ -35,3 +38,10 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+    networks:
+      - default
+      - coolify
+
+networks:
+  coolify:
+    external: true
