@@ -3,11 +3,11 @@ __pycache__
 .pytest_cache
 .venv
 *.egg-info
-node_modules
-dist
 .git
 .env
+
+# Dashboard (not needed for API build)
+dashboard/
 docs/
 knowledge/
 CLAUDE.md
-*.md

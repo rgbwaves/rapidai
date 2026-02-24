@@ -2,10 +2,12 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install dependencies first (cached layer)
+COPY rapid_ai_engine/requirements.txt ./rapid_ai_engine/
+RUN pip install --no-cache-dir -r rapid_ai_engine/requirements.txt
 
-COPY . .
+# Copy only the engine package
+COPY rapid_ai_engine/ ./rapid_ai_engine/
 
 EXPOSE 8000
 
