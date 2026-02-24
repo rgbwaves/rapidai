@@ -19,7 +19,7 @@ export default function RequestBuilder() {
   const [assetId, setAssetId] = useState('PUMP-001')
   const [machineType, setMachineType] = useState(MACHINE_TYPES[0])
   const [component, setComponent] = useState(COMPONENTS[0])
-  const [criticality, setCriticality] = useState(3)
+  const [criticality, setCriticality] = useState(0.6)
   const [failureThreshold, setFailureThreshold] = useState(11.2)
   const [operatingHours, setOperatingHours] = useState(8760)
 
@@ -129,20 +129,20 @@ export default function RequestBuilder() {
           </div>
           <div>
             <label className="block text-xs text-slate-400 mb-1">
-              Criticality: {criticality}
+              Criticality: {criticality.toFixed(2)}
             </label>
             <input
               type="range"
-              min={1}
-              max={5}
-              step={1}
+              min={0}
+              max={1}
+              step={0.05}
               value={criticality}
               onChange={(e) => setCriticality(Number(e.target.value))}
               className="w-full accent-sky-500"
             />
             <div className="flex justify-between text-[10px] text-slate-600">
-              <span>1 (Low)</span>
-              <span>5 (Critical)</span>
+              <span>0 (Low)</span>
+              <span>1 (Critical)</span>
             </div>
           </div>
           <div>
