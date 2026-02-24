@@ -4,38 +4,16 @@ Aggregates block-level scores from B/B+/B++ into a system-level SSI.
 SSI = Σ(weight_i × block_score_i)
 """
 import time
-import logging
+import structlog
 from typing import Dict
 
 from ..schemas import (
     ModuleCRequest, ModuleCResponse, SystemState, TrendClass, StabilityState
 )
+from ..rules.loader import load_profiles
+from ..config import classify_ssi
 
-# ─── Profile Definitions (weight per block) ──────────────────────
-
-PROFILES = {
-    "pump_train_horizontal": {
-        "id": "PROFILE_PUMP_A",
-        "weights": {
-            "foundation": 0.15, "ac_motor": 0.10, "coupling": 0.10,
-            "shafts": 0.10, "afb": 0.25, "fluid_flow": 0.30,
-        },
-    },
-    "gearbox_train": {
-        "id": "PROFILE_GBX_A",
-        "weights": {
-            "foundation": 0.15, "ac_motor": 0.10, "coupling": 0.10,
-            "shafts": 0.10, "gears": 0.35, "afb": 0.20,
-        },
-    },
-    "fan_train": {
-        "id": "PROFILE_FAN_A",
-        "weights": {
-            "foundation": 0.15, "ac_motor": 0.15, "coupling": 0.05,
-            "shafts": 0.10, "afb": 0.25, "fluid_flow": 0.30,
-        },
-    },
-}
+# ─── Profile Definitions — loaded from rules/profiles.yaml ───────
 
 # Default catch-all profile (equal weights)
 DEFAULT_PROFILE = {
@@ -76,13 +54,8 @@ def _block_score(b_match: float, trend_class: TrendClass, confidence: float,
 
 
 def _ssi_to_state(ssi: float) -> SystemState:
-    if ssi >= 0.80:
-        return SystemState.critical
-    elif ssi >= 0.60:
-        return SystemState.unstable
-    elif ssi >= 0.30:
-        return SystemState.degrading
-    return SystemState.stable
+    """Classify SSI into system state — delegates to shared config."""
+    return classify_ssi(ssi)
 
 
 def _state_to_action(state: SystemState) -> str:
@@ -95,65 +68,97 @@ def _state_to_action(state: SystemState) -> str:
     }.get(state, "monitor")
 
 
+def _load_and_normalize_weights(system_type: str, blocks: Dict) -> tuple:
+    """Load profile for system_type and renormalize weights for present blocks.
+
+    Returns (profile_id, weights) where weights maps block names to
+    normalized floats summing to ~1.0.
+    """
+    profiles = load_profiles()
+    profile = profiles.get(system_type, DEFAULT_PROFILE)
+    profile_id = profile["id"]
+    weights = profile.get("weights", {})
+
+    # If no profile weights, distribute evenly
+    if not weights and blocks:
+        n = len(blocks)
+        weights = {k: 1.0 / n for k in blocks}
+
+    # Renormalize weights for blocks actually present
+    if weights:
+        active_weights = {k: weights[k] for k in blocks if k in weights}
+        weight_sum = sum(active_weights.values())
+        if weight_sum > 0 and weight_sum < 0.99:  # Missing blocks
+            active_weights = {k: v / weight_sum for k, v in active_weights.items()}
+        weights = active_weights
+
+    return profile_id, weights
+
+
+def _compute_block_scores(blocks: Dict) -> Dict[str, float]:
+    """Compute block scores from B/B+/B++ outputs for each block."""
+    block_scores = {}
+    for block_name, block_input in blocks.items():
+        bs = _block_score(
+            block_input.B_match_score,
+            block_input.Bplus_trend_class,
+            block_input.Bplus_confidence,
+            block_input.process_correlation,
+        )
+        block_scores[block_name] = bs
+    return block_scores
+
+
+def _aggregate_ssi(block_scores: Dict[str, float], weights: Dict[str, float]) -> float:
+    """Compute weighted SSI from block scores and weights, clamped to [0, 1]."""
+    ssi = 0.0
+    for block_name, score in block_scores.items():
+        w = weights.get(block_name, 0.0)
+        ssi += w * score
+    return max(0.0, min(1.0, ssi))
+
+
+def _check_process_driven(blocks: Dict) -> bool:
+    """Return True if majority of blocks are process-correlated."""
+    process_driven_count = sum(
+        1 for b in blocks.values() if b.process_correlation >= 0.70
+    )
+    return process_driven_count > len(blocks) / 2
+
+
+def _rank_contributors(block_scores: Dict[str, float], weights: Dict[str, float],
+                       top_n: int = 3) -> list:
+    """Rank blocks by weighted contribution and return top N names."""
+    contributions = [
+        (name, weights.get(name, 0.0) * block_scores.get(name, 0.0))
+        for name in block_scores
+    ]
+    contributions.sort(key=lambda x: x[1], reverse=True)
+    return [c[0] for c in contributions[:top_n]]
+
+
 def run(request: ModuleCRequest) -> ModuleCResponse:
     t0 = time.perf_counter()
     try:
-        profile = PROFILES.get(request.system_type, DEFAULT_PROFILE)
-        profile_id = request.profile_id or profile["id"]
-        weights = profile.get("weights", {})
+        default_profile_id, weights = _load_and_normalize_weights(
+            request.system_type, request.blocks
+        )
+        profile_id = request.profile_id or default_profile_id
 
-        # If no profile weights, distribute evenly
-        if not weights and request.blocks:
-            n = len(request.blocks)
-            weights = {k: 1.0 / n for k in request.blocks}
+        block_scores = _compute_block_scores(request.blocks)
+        ssi = _aggregate_ssi(block_scores, weights)
 
-        # Renormalize weights for blocks actually present
-        if weights:
-            active_weights = {k: weights[k] for k in request.blocks if k in weights}
-            weight_sum = sum(active_weights.values())
-            if weight_sum > 0 and weight_sum < 0.99:  # Missing blocks
-                active_weights = {k: v / weight_sum for k, v in active_weights.items()}
-            weights = active_weights
-
-        # ── Compute block scores and SSI ──
-        block_scores = {}
-        for block_name, block_input in request.blocks.items():
-            bs = _block_score(
-                block_input.B_match_score,
-                block_input.Bplus_trend_class,
-                block_input.Bplus_confidence,
-                block_input.process_correlation,
-            )
-            block_scores[block_name] = bs
-
-        # SSI = weighted sum
-        ssi = 0.0
-        for block_name, score in block_scores.items():
-            w = weights.get(block_name, 0.0)
-            ssi += w * score
-        ssi = max(0.0, min(1.0, ssi))
-
-        # ── Gating rule: B++ critical instability → SSI floor ──
+        # Gating rule: B++ critical instability -> SSI floor
         if request.stability_state == StabilityState.Critical_Instability:
             ssi = max(ssi, 0.70)
 
-        # ── System state ──
-        # Check if process-driven
-        process_driven_count = sum(
-            1 for b in request.blocks.values() if b.process_correlation >= 0.70
-        )
-        if process_driven_count > len(request.blocks) / 2:
+        # System state
+        if _check_process_driven(request.blocks):
             system_state = SystemState.process_driven
         else:
             system_state = _ssi_to_state(ssi)
 
-        # Top contributors (sorted by weighted contribution)
-        contributions = [
-            (name, weights.get(name, 0.0) * block_scores.get(name, 0.0))
-            for name in block_scores
-        ]
-        contributions.sort(key=lambda x: x[1], reverse=True)
-        top = [c[0] for c in contributions[:3]]
+        top = _rank_contributors(block_scores, weights)
 
         elapsed = (time.perf_counter() - t0) * 1000
         return ModuleCResponse(
@@ -167,7 +172,7 @@ def run(request: ModuleCRequest) -> ModuleCResponse:
         )
     except Exception as e:
         elapsed = (time.perf_counter() - t0) * 1000
-        logging.getLogger(__name__).error(f"Module C error: {e}", exc_info=True)
+        structlog.get_logger(__name__).error("module_error", module="C", error=str(e), exc_info=True)
         return ModuleCResponse(
             execution_time_ms=round(elapsed, 2),
             system_type=request.system_type,

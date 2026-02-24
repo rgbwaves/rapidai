@@ -5,7 +5,7 @@ Computes RMS, peak, kurtosis, crest factor, degradation, severity.
 """
 import time
 import math
-import logging
+import structlog
 import numpy as np
 from typing import List, Optional
 
@@ -122,7 +122,7 @@ def run(request: ModuleARequest) -> ModuleAResponse:
         )
     except Exception as e:
         elapsed = (time.perf_counter() - t0) * 1000
-        logging.getLogger(__name__).error(f"Module A error: {e}", exc_info=True)
+        structlog.get_logger(__name__).error("module_error", module="A", error=str(e), exc_info=True)
         return ModuleAResponse(
             execution_time_ms=round(elapsed, 2),
             severity_score=0.0,

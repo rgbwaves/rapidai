@@ -3,18 +3,19 @@ Module D — Fault Mechanism (Health Stages)
 Maps SSI + SSI_slope into a degradation stage, RUL band, and escalation level.
 """
 import time
-import logging
+import structlog
 
 from ..schemas import (
-    ModuleDRequest, ModuleDResponse, HealthStage, EscalationLevel
+    ModuleDRequest, ModuleDResponse, HealthStage, EscalationLevel, SystemState
 )
+from ..config import SSI_THRESHOLDS, SLOPE_THRESHOLDS
 
-# ─── Module D Constants ──────────────────────────────────────────
-SSI_CRITICAL = 0.80
-SSI_UNSTABLE = 0.60
-SSI_DEGRADING = 0.30
-SLOPE_ESCALATION_UNSTABLE = 0.05
-SLOPE_ESCALATION_DEGRADING = 0.02
+# ─── Module D Constants (from shared config) ─────────────────────
+SSI_CRITICAL = SSI_THRESHOLDS[SystemState.critical][0]
+SSI_UNSTABLE = SSI_THRESHOLDS[SystemState.unstable][0]
+SSI_DEGRADING = SSI_THRESHOLDS[SystemState.degrading][0]
+SLOPE_ESCALATION_UNSTABLE = SLOPE_THRESHOLDS["escalation_unstable"]
+SLOPE_ESCALATION_DEGRADING = SLOPE_THRESHOLDS["escalation_degrading"]
 
 
 def run(request: ModuleDRequest) -> ModuleDResponse:
@@ -78,7 +79,7 @@ def run(request: ModuleDRequest) -> ModuleDResponse:
         )
     except Exception as e:
         elapsed = (time.perf_counter() - t0) * 1000
-        logging.getLogger(__name__).error(f"Module D error: {e}", exc_info=True)
+        structlog.get_logger(__name__).error("module_error", module="D", error=str(e), exc_info=True)
         return ModuleDResponse(
             execution_time_ms=round(elapsed, 2),
             degradation_stage=HealthStage.Healthy,

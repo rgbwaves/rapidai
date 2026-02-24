@@ -5,7 +5,7 @@ Classifies trends: Stable, Drift, Accelerating, Chaotic, Step.
 """
 import time
 import math
-import logging
+import structlog
 import numpy as np
 from typing import List
 
@@ -108,7 +108,7 @@ def run(request: ModuleBPlusRequest) -> ModuleBPlusResponse:
         )
     except Exception as e:
         elapsed = (time.perf_counter() - t0) * 1000
-        logging.getLogger(__name__).error(f"Module B+ error: {e}", exc_info=True)
+        structlog.get_logger(__name__).error("module_error", module="B+", error=str(e), exc_info=True)
         return ModuleBPlusResponse(
             execution_time_ms=round(elapsed, 2),
             trend_class=TrendClass.Stable,

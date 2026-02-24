@@ -1,15 +1,12 @@
 import { useState } from 'react'
-import type { Scenario } from '../types/rapid-ai'
+import { useNavigate } from 'react-router-dom'
+import { useAnalysis } from '../context/AnalysisContext'
 import HealthBadge from '../components/HealthBadge'
 import RadialGauge from '../components/RadialGauge'
 import EntropyRadar from '../components/EntropyRadar'
 import ActionPlanCard from '../components/ActionPlanCard'
 import { severityColor, scoreToColor } from '../utils/colors'
 import { pct, fixed } from '../utils/formatters'
-
-interface Props {
-  scenario: Scenario
-}
 
 const tabs = [
   { id: '0', label: 'Guard' },
@@ -23,9 +20,28 @@ const tabs = [
   { id: 'F', label: 'RUL' },
 ]
 
-export default function ModuleExplorer({ scenario }: Props) {
+export default function ModuleExplorer() {
   const [active, setActive] = useState('0')
-  const trace = scenario.response.module_trace
+  const navigate = useNavigate()
+  const { result } = useAnalysis()
+
+  // Empty state — no result yet
+  if (!result) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <div className="text-slate-500 text-lg">No analysis results yet</div>
+        <p className="text-slate-600 text-sm">Submit a new analysis to explore module outputs.</p>
+        <button
+          onClick={() => navigate('/')}
+          className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-sm transition-colors"
+        >
+          New Analysis
+        </button>
+      </div>
+    )
+  }
+
+  const trace = result.module_trace
 
   return (
     <div className="max-w-7xl space-y-4">
@@ -127,7 +143,7 @@ export default function ModuleExplorer({ scenario }: Props) {
                 </span>
                 <div className="text-xs text-slate-400 mt-1">Classification: {trace.moduleA.trend_classification}</div>
                 {trace.moduleA.ratio_to_baseline && (
-                  <div className="text-xs text-slate-400">Baseline ratio: {fixed(trace.moduleA.ratio_to_baseline)}×</div>
+                  <div className="text-xs text-slate-400">Baseline ratio: {fixed(trace.moduleA.ratio_to_baseline)}&times;</div>
                 )}
               </div>
             </div>
@@ -291,7 +307,7 @@ export default function ModuleExplorer({ scenario }: Props) {
             <div className="grid grid-cols-4 gap-3">
               {[
                 { label: 'RUL (days)', value: fixed(trace.moduleF.RUL_days) },
-                { label: 'P₃₀', value: pct(trace.moduleF.failure_probability_30d) },
+                { label: 'P30', value: pct(trace.moduleF.failure_probability_30d) },
                 { label: 'Risk Index', value: fixed(trace.moduleF.risk_index) },
                 { label: 'Window', value: trace.moduleF.recommended_window },
               ].map((m) => (
@@ -306,14 +322,14 @@ export default function ModuleExplorer({ scenario }: Props) {
                 <div className="card-title mt-4">Weibull Reliability Metrics</div>
                 <div className="grid grid-cols-3 gap-2 mt-2">
                   {[
-                    { label: 'β (base)', value: fixed(trace.moduleF.reliability_metrics.beta_base, 3) },
-                    { label: 'β (adjusted)', value: fixed(trace.moduleF.reliability_metrics.beta_adj, 3) },
-                    { label: 'η base (hrs)', value: trace.moduleF.reliability_metrics.eta_base_hours.toLocaleString() },
-                    { label: 'η adj (hrs)', value: Math.round(trace.moduleF.reliability_metrics.eta_adj_hours).toLocaleString() },
+                    { label: 'beta (base)', value: fixed(trace.moduleF.reliability_metrics.beta_base, 3) },
+                    { label: 'beta (adjusted)', value: fixed(trace.moduleF.reliability_metrics.beta_adj, 3) },
+                    { label: 'eta base (hrs)', value: trace.moduleF.reliability_metrics.eta_base_hours.toLocaleString() },
+                    { label: 'eta adj (hrs)', value: Math.round(trace.moduleF.reliability_metrics.eta_adj_hours).toLocaleString() },
                     { label: 'Bathtub Phase', value: trace.moduleF.reliability_metrics.bathtub_phase.replace('_', ' ') },
                     { label: 'N&H Pattern', value: trace.moduleF.reliability_metrics.nowlan_heap_pattern },
                     { label: 'Hazard Rate', value: trace.moduleF.reliability_metrics.hazard_rate.toExponential(2) },
-                    { label: 'Weibull P₃₀', value: pct(trace.moduleF.reliability_metrics.weibull_failure_prob_30d) },
+                    { label: 'Weibull P30', value: pct(trace.moduleF.reliability_metrics.weibull_failure_prob_30d) },
                     { label: 'P-F Position', value: pct(trace.moduleF.reliability_metrics.pf_interval_position) },
                   ].map((m) => (
                     <div key={m.label} className="bg-slate-900/50 rounded-lg p-2">

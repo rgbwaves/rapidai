@@ -1,18 +1,61 @@
-import type { Scenario } from '../types/rapid-ai'
+import { useNavigate } from 'react-router-dom'
+import { useAnalysis } from '../context/AnalysisContext'
 import HealthBadge from '../components/HealthBadge'
 import RadialGauge from '../components/RadialGauge'
 import ActionPlanCard from '../components/ActionPlanCard'
-import InsightBlock from '../components/InsightBlock'
 import PFDiagram from '../components/PFDiagram'
+import SignalWaveform from '../components/SignalWaveform'
+import PipelineTimeline from '../components/PipelineTimeline'
 import { scoreToColor, severityColor } from '../utils/colors'
 import { days, pct, fixed } from '../utils/formatters'
 
-interface Props {
-  scenario: Scenario
-}
+export default function PipelineDashboard() {
+  const navigate = useNavigate()
+  const { result, request, isLoading, error, runAnalysis } = useAnalysis()
 
-export default function PipelineDashboard({ scenario }: Props) {
-  const r = scenario.response
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <div className="w-12 h-12 border-4 border-sky-400 border-t-transparent rounded-full animate-spin" />
+        <p className="text-slate-400 text-sm">Running RAPID AI pipeline...</p>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <div className="text-red-400 text-lg font-bold">Analysis Failed</div>
+        <p className="text-slate-400 text-sm max-w-md text-center">{error}</p>
+        <button
+          onClick={() => request && runAnalysis(request)}
+          className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-sm transition-colors"
+        >
+          Retry Analysis
+        </button>
+      </div>
+    )
+  }
+
+  // Empty state — no result yet
+  if (!result) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <div className="text-slate-500 text-lg">No analysis results yet</div>
+        <p className="text-slate-600 text-sm">Submit a new analysis to see results here.</p>
+        <button
+          onClick={() => navigate('/')}
+          className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-sm transition-colors"
+        >
+          New Analysis
+        </button>
+      </div>
+    )
+  }
+
+  const r = result
   const trace = r.module_trace
   const rel = r.reliability_metrics
 
@@ -22,13 +65,25 @@ export default function PipelineDashboard({ scenario }: Props) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-white">{r.asset_id}</h2>
-          <p className="text-sm text-slate-400 mt-1">{scenario.description}</p>
+          <p className="text-sm text-slate-400 mt-1">{r.recommended_action}</p>
         </div>
         <div className="flex items-center gap-3">
           <HealthBadge stage={r.health_stage} size="lg" />
           <span className="text-xs text-slate-500 font-mono">{r.trace_id}</span>
         </div>
       </div>
+
+      {/* Submitted Signal Waveform */}
+      {request?.signal?.values && request.signal.values.length > 0 && (
+        <div className="card">
+          <div className="card-title">Submitted Signal</div>
+          <SignalWaveform
+            values={request.signal.values}
+            samplingRate={request.signal.sampling_rate_hz}
+            rms={trace.moduleA?.overall_rms}
+          />
+        </div>
+      )}
 
       {/* Top gauges row */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -87,7 +142,7 @@ export default function PipelineDashboard({ scenario }: Props) {
           </div>
           {rel && (
             <div className="mt-2 text-xs text-slate-400 space-y-1">
-              <div>Weibull P₃₀: {pct(rel.weibull_failure_prob_30d)}</div>
+              <div>Weibull P30: {pct(rel.weibull_failure_prob_30d)}</div>
               <div>Hazard rate: {rel.hazard_rate.toExponential(2)}</div>
             </div>
           )}
@@ -110,9 +165,6 @@ export default function PipelineDashboard({ scenario }: Props) {
         </div>
       </div>
 
-      {/* AI Insight */}
-      <InsightBlock text={scenario.ai_insight} severity={r.final_severity_level} />
-
       {/* Action Plan */}
       <div>
         <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
@@ -125,12 +177,13 @@ export default function PipelineDashboard({ scenario }: Props) {
         </div>
       </div>
 
-      {/* Pipeline Timing */}
+      {/* Pipeline Execution Timeline */}
       <div className="card">
         <div className="card-title">Pipeline Execution</div>
-        <div className="text-sm text-slate-300">
-          Total: {fixed(r.execution_time_ms, 1)} ms — Data Quality: {pct(trace.module0?.quality_score || 1)}
+        <div className="text-sm text-slate-300 mb-3">
+          Total: {fixed(r.execution_time_ms, 1)} ms &mdash; Data Quality: {pct(trace.module0?.quality_score || 1)}
         </div>
+        <PipelineTimeline trace={trace} totalMs={r.execution_time_ms} />
       </div>
     </div>
   )

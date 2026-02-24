@@ -3,89 +3,33 @@ Module E — Maintenance Plan (Priority Scoring)
 P = 100 × (0.45·S + 0.25·C + 0.20·K + 0.10·U) × M_safe × R_sp × R_mp
 """
 import time
-import logging
+import structlog
 from typing import List
 
 from ..schemas import (
     ModuleERequest, ModuleEResponse, PlanItem
 )
+from ..rules.loader import load_actions
+from ..config import PRIORITY_WEIGHTS, PRIORITY_MODIFIERS, PRIORITY_WINDOWS
 
-# ─── Module E Constants ──────────────────────────────────────────
-W_SEVERITY = 0.45
-W_CONFIDENCE = 0.25
-W_CRITICALITY = 0.20
-W_URGENCY = 0.10
-SAFETY_MULTIPLIER = 1.5
-SPARES_PENALTY = 0.7
-MANPOWER_PENALTY = 0.7
-PRIORITY_IMMEDIATE = 85
-PRIORITY_24H = 70
-PRIORITY_7D = 50
-
-# ─── Action Catalog ──────────────────────────────────────────
-ACTION_CATALOG = {
-    "ACT001": {
-        "title": "Vibration re-measure (confirmation run)",
-        "justification": "Confirm trend before committing to intervention",
-        "verification": "Compare new RMS to previous within ±10%",
-    },
-    "ACT002": {
-        "title": "Bearing lubrication / grease replenishment",
-        "justification": "High frequency or temperature rise indicates lubrication deficit",
-        "verification": "HF amplitude and temperature return to baseline within 24h",
-    },
-    "ACT003": {
-        "title": "Alignment check (laser / dial indicator)",
-        "justification": "Axial dominance and coupling signature indicate misalignment",
-        "verification": "Alignment report within tolerance per OEM spec",
-    },
-    "ACT004": {
-        "title": "Balance correction (single / dual plane)",
-        "justification": "1× dominance with horizontal preference indicates imbalance",
-        "verification": "1× amplitude reduced by ≥50% post-correction",
-    },
-    "ACT005": {
-        "title": "Bearing replacement (scheduled)",
-        "justification": "BPFO/BPFI signatures with acceleration confirms bearing defect",
-        "verification": "Post-replacement vibration within acceptance limits",
-    },
-    "ACT006": {
-        "title": "Foundation tightening / soft foot correction",
-        "justification": "V/H ratio and looseness indicate structural issues",
-        "verification": "Phase stability and reduced looseness harmonics",
-    },
-    "ACT007": {
-        "title": "Process investigation (not machine fault)",
-        "justification": "Trend correlates with process variable, not machine degradation",
-        "verification": "Vibration returns to normal with process stabilisation",
-    },
-    "ACT008": {
-        "title": "Emergency shutdown / trip recommendation",
-        "justification": "Critical SSI with accelerating trend, imminent failure risk",
-        "verification": "Machine isolated, inspection completed before restart",
-    },
-}
-
-# Stem-based mapping from diagnosis keywords to recommended action IDs
-# Stems match broader word forms (e.g., "imbalanc" matches imbalance/imbalanced)
-DIAGNOSIS_ACTION_MAP = {
-    "imbalanc": ["ACT004", "ACT001"],
-    "unbalanc": ["ACT004", "ACT001"],
-    "misalign": ["ACT003", "ACT001"],
-    "bearing": ["ACT002", "ACT005"],
-    "lubric": ["ACT002"],
-    "loose": ["ACT006", "ACT001"],
-    "foundation": ["ACT006"],
-    "process": ["ACT007"],
-    "critical": ["ACT008"],
-    "shutdown": ["ACT008"],
-    "cavitat": ["ACT007", "ACT001"],
-    "resonan": ["ACT006", "ACT001"],
-}
+# ─── Module E Constants (from shared config) ─────────────────────
+W_SEVERITY = PRIORITY_WEIGHTS["severity"]
+W_CONFIDENCE = PRIORITY_WEIGHTS["confidence"]
+W_CRITICALITY = PRIORITY_WEIGHTS["criticality"]
+W_URGENCY = PRIORITY_WEIGHTS["urgency"]
+SAFETY_MULTIPLIER = PRIORITY_MODIFIERS["safety_multiplier"]
+SPARES_PENALTY = PRIORITY_MODIFIERS["spares_penalty"]
+MANPOWER_PENALTY = PRIORITY_MODIFIERS["manpower_penalty"]
+PRIORITY_IMMEDIATE = PRIORITY_WINDOWS["immediate"]
+PRIORITY_24H = PRIORITY_WINDOWS["24h"]
+PRIORITY_7D = PRIORITY_WINDOWS["7d"]
 
 
 def _select_actions(diagnosis: str | None, priority: float) -> List[str]:
     """Pick action IDs based on diagnosis keywords and priority."""
+    actions_data = load_actions()
+    diagnosis_map = actions_data.get("diagnosis_map", {})
+
     if priority >= PRIORITY_IMMEDIATE:
         # Always include shutdown recommendation at top
         actions = ["ACT008"]
@@ -94,7 +38,7 @@ def _select_actions(diagnosis: str | None, priority: float) -> List[str]:
 
     if diagnosis:
         diag_lower = diagnosis.lower()
-        for keyword, act_ids in DIAGNOSIS_ACTION_MAP.items():
+        for keyword, act_ids in diagnosis_map.items():
             if keyword in diag_lower:
                 actions.extend(act_ids)
 
@@ -149,9 +93,10 @@ def run(request: ModuleERequest) -> ModuleEResponse:
         # Select actions
         action_ids = _select_actions(request.diagnosis, P)
 
+        actions_data = load_actions()
         plan_items: List[PlanItem] = []
         for rank, act_id in enumerate(action_ids, start=1):
-            cat = ACTION_CATALOG.get(act_id, {
+            cat = actions_data.get(act_id, {
                 "title": f"Action {act_id}",
                 "justification": "See diagnosis",
                 "verification": "Verify post-action",
@@ -174,7 +119,7 @@ def run(request: ModuleERequest) -> ModuleEResponse:
         )
     except Exception as e:
         elapsed = (time.perf_counter() - t0) * 1000
-        logging.getLogger(__name__).error(f"Module E error: {e}", exc_info=True)
+        structlog.get_logger(__name__).error("module_error", module="E", error=str(e), exc_info=True)
         return ModuleEResponse(
             execution_time_ms=round(elapsed, 2),
             plan_items=[],

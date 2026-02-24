@@ -1,14 +1,11 @@
-import type { Scenario } from '../types/rapid-ai'
+import { useNavigate } from 'react-router-dom'
+import { useAnalysis } from '../context/AnalysisContext'
 import WeibullChart from '../components/WeibullChart'
 import BathtubCurve from '../components/BathtubCurve'
 import HazardRateChart from '../components/HazardRateChart'
 import PFDiagram from '../components/PFDiagram'
 import { pct, fixed, days } from '../utils/formatters'
 import { bathtubColor } from '../utils/colors'
-
-interface Props {
-  scenario: Scenario
-}
 
 const weibullParams = [
   { component: 'Bearing (AFB)', beta: 1.5, eta: 50000 },
@@ -30,14 +27,33 @@ const nhPatterns = [
   { pattern: 'F', name: 'Infant mortality', pct: '68%', desc: 'High early, then constant' },
 ]
 
-export default function ReliabilityView({ scenario }: Props) {
-  const rel = scenario.response.reliability_metrics
+export default function ReliabilityView() {
+  const navigate = useNavigate()
+  const { result } = useAnalysis()
+
+  // Empty state — no result yet
+  if (!result) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <div className="text-slate-500 text-lg">No analysis results yet</div>
+        <p className="text-slate-600 text-sm">Submit a new analysis to see reliability data.</p>
+        <button
+          onClick={() => navigate('/')}
+          className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-sm transition-colors"
+        >
+          New Analysis
+        </button>
+      </div>
+    )
+  }
+
+  const rel = result.reliability_metrics
 
   if (!rel) {
     return (
       <div className="max-w-7xl">
         <h2 className="text-xl font-bold text-white mb-4">Reliability Engineering</h2>
-        <p className="text-slate-400">No reliability metrics available for this scenario.</p>
+        <p className="text-slate-400">No reliability metrics available for this analysis.</p>
       </div>
     )
   }
@@ -66,10 +82,10 @@ export default function ReliabilityView({ scenario }: Props) {
       {/* Key metrics row */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         {[
-          { label: 'β (adjusted)', value: fixed(rel.beta_adj, 3) },
-          { label: 'η (adj hours)', value: Math.round(rel.eta_adj_hours).toLocaleString() },
+          { label: 'beta (adjusted)', value: fixed(rel.beta_adj, 3) },
+          { label: 'eta (adj hours)', value: Math.round(rel.eta_adj_hours).toLocaleString() },
           { label: 'Hazard Rate', value: rel.hazard_rate.toExponential(2) },
-          { label: 'Weibull P₃₀', value: pct(rel.weibull_failure_prob_30d) },
+          { label: 'Weibull P30', value: pct(rel.weibull_failure_prob_30d) },
           { label: 'Weibull RUL', value: rel.weibull_rul_days != null ? days(rel.weibull_rul_days) : 'N/A' },
           { label: 'P-F Position', value: pct(rel.pf_interval_position) },
         ].map((m) => (
@@ -84,13 +100,13 @@ export default function ReliabilityView({ scenario }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Weibull PDF/CDF/Reliability */}
         <div className="card">
-          <div className="card-title">Weibull Distribution (β={fixed(rel.beta_adj, 2)}, η={Math.round(rel.eta_adj_hours)}h)</div>
+          <div className="card-title">Weibull Distribution (beta={fixed(rel.beta_adj, 2)}, eta={Math.round(rel.eta_adj_hours)}h)</div>
           <WeibullChart beta={rel.beta_adj} eta={rel.eta_adj_hours} />
         </div>
 
         {/* Bathtub curve */}
         <div className="card">
-          <div className="card-title">Bathtub Curve — Current Phase</div>
+          <div className="card-title">Bathtub Curve &mdash; Current Phase</div>
           <BathtubCurve currentPhase={rel.bathtub_phase} beta={rel.beta_adj} />
         </div>
 
@@ -122,8 +138,8 @@ export default function ReliabilityView({ scenario }: Props) {
             <thead>
               <tr className="text-left text-slate-500 text-xs uppercase border-b border-slate-700">
                 <th className="p-2">Component</th>
-                <th className="p-2">β (shape)</th>
-                <th className="p-2">η (scale, hours)</th>
+                <th className="p-2">beta (shape)</th>
+                <th className="p-2">eta (scale, hours)</th>
                 <th className="p-2">Failure Mode</th>
               </tr>
             </thead>
@@ -171,7 +187,7 @@ export default function ReliabilityView({ scenario }: Props) {
             </tbody>
           </table>
           <p className="text-xs text-slate-500 mt-3">
-            82% of failures (D+E+F) are random or infant mortality — time-based replacement is ineffective. Only condition-based monitoring catches them.
+            82% of failures (D+E+F) are random or infant mortality &mdash; time-based replacement is ineffective. Only condition-based monitoring catches them.
           </p>
         </div>
       </div>

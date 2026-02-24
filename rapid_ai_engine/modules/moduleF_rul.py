@@ -26,8 +26,9 @@ from ..schemas import (
     ModuleFRequest, ModuleFResponse,
     ReliabilityMetrics, BathtubPhase,
 )
+from ..config import WEIBULL_COEFFICIENTS
 
-# ─── Component Weibull Parameters (β_base, η_base in hours) ────
+# ─── Component Weibull Parameters (beta_base, eta_base in hours) ────
 COMPONENT_WEIBULL = {
     "bearing":    {"beta": 1.5, "eta": 50000},
     "seal":       {"beta": 1.2, "eta": 30000},
@@ -39,10 +40,10 @@ COMPONENT_WEIBULL = {
     "foundation": {"beta": 1.1, "eta": 120000},
 }
 
-# Adjustment coefficients
-ALPHA_SEVERITY = 0.8     # S_eff → β adjustment strength
-GAMMA_DEGRADATION = 0.6  # SSI → η adjustment strength
-R_TARGET = 0.90          # Reliability target for Weibull RUL
+# Adjustment coefficients (from shared config)
+ALPHA_SEVERITY = WEIBULL_COEFFICIENTS["alpha_severity"]
+GAMMA_DEGRADATION = WEIBULL_COEFFICIENTS["gamma_degradation"]
+R_TARGET = WEIBULL_COEFFICIENTS["r_target"]
 RUL_MAX_DAYS = 3650.0    # Maximum RUL cap (10 years)
 ACCEL_MODEL_THRESHOLD = 0.01   # slope_change threshold for accelerating model
 INSTABILITY_THRESHOLD = 0.6     # NLI threshold for instability adjustment
@@ -141,26 +142,17 @@ def _compute_reliability(
     )
 
 
-def run(request: ModuleFRequest) -> ModuleFResponse:
-    t0 = time.perf_counter()
+def _select_rul_model(slope_log: float, slope_change: float, nli: float,
+                      ln_ratio: float, current: float, threshold: float) -> float:
+    """Select and compute RUL using linear, accelerating, or instability model.
 
-    slope_log = request.slope_log
-    slope_change = request.slope_change
-    nli = request.instability_index_NLI
-    confidence = request.confidence
-    severity = request.severity_score
-    criticality = request.criticality
-    current = request.current_value
-    threshold = request.failure_threshold
-
-    # ── Select RUL model ──
-    ln_ratio = _safe_ln_ratio(threshold, current)
-
+    Returns RUL in days, clamped to [0, RUL_MAX_DAYS].
+    """
     # Guard: if current already exceeds threshold, RUL = 0
     if current >= threshold:
         rul_days = 0.0
     elif abs(slope_log) < 1e-9:
-        # No meaningful slope → very long RUL (cap at 3650 days / 10 years)
+        # No meaningful slope -> very long RUL (cap at 10 years)
         rul_days = RUL_MAX_DAYS
     else:
         # Model selection
@@ -179,33 +171,62 @@ def run(request: ModuleFRequest) -> ModuleFResponse:
         if nli >= INSTABILITY_THRESHOLD:
             rul_days = rul_days * (1.0 - nli)
 
-    # Clamp RUL
-    rul_days = max(0.0, min(RUL_MAX_DAYS, rul_days))
+    return max(0.0, min(RUL_MAX_DAYS, rul_days))
 
-    # ── Failure probability (30-day horizon) ──
+
+def _compute_failure_probability(rul_days: float, confidence: float) -> float:
+    """Compute 30-day failure probability, adjusted by confidence.
+
+    P_30 = 1 - exp(-30 / RUL_days), then P_adj = P_30 * confidence.
+    Returns value clamped to [0, 1].
+    """
     if rul_days > 1e-6:
         p_30 = 1.0 - math.exp(-30.0 / rul_days)
     else:
         p_30 = 1.0  # Already at/past threshold
 
     p_adj = p_30 * confidence
-    p_adj = max(0.0, min(1.0, p_adj))
+    return max(0.0, min(1.0, p_adj))
 
-    # ── Risk index ──
+
+def _compute_risk_index(severity: float, criticality: float) -> float:
+    """Compute risk index = 100 * severity * criticality, clamped to [0, 100]."""
     risk_index = 100.0 * severity * criticality
-    risk_index = max(0.0, min(100.0, risk_index))
+    return max(0.0, min(100.0, risk_index))
 
-    # ── Recommended window ──
+
+def _determine_window(rul_days: float) -> str:
+    """Map RUL days to a maintenance window recommendation."""
     if rul_days < 7:
-        window = "Immediate"
+        return "Immediate"
     elif rul_days < 30:
-        window = "Urgent (< 30 days)"
+        return "Urgent (< 30 days)"
     elif rul_days < 180:
-        window = "Planned"
+        return "Planned"
     else:
-        window = "Monitor"
+        return "Monitor"
 
-    # ── Reliability Engineering (Weibull) ──
+
+def run(request: ModuleFRequest) -> ModuleFResponse:
+    t0 = time.perf_counter()
+
+    slope_log = request.slope_log
+    slope_change = request.slope_change
+    nli = request.instability_index_NLI
+    confidence = request.confidence
+    severity = request.severity_score
+    criticality = request.criticality
+    current = request.current_value
+    threshold = request.failure_threshold
+
+    ln_ratio = _safe_ln_ratio(threshold, current)
+
+    rul_days = _select_rul_model(slope_log, slope_change, nli, ln_ratio, current, threshold)
+    p_adj = _compute_failure_probability(rul_days, confidence)
+    risk_index = _compute_risk_index(severity, criticality)
+    window = _determine_window(rul_days)
+
+    # Reliability Engineering (Weibull)
     reliability = _compute_reliability(
         component_type=request.component_type,
         severity=severity,

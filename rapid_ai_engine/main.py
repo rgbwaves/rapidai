@@ -36,6 +36,9 @@ from .schemas import (
     SeverityLevel, HealthStage,
 )
 
+from .config import classify_severity, TRIAXIAL_PROXY
+from .logging_config import configure_logging
+
 from .modules import (
     module0_dataguard,
     moduleA_trend,
@@ -54,6 +57,7 @@ _executor = ThreadPoolExecutor(max_workers=4)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    configure_logging(json_output=True)
     yield
     _executor.shutdown(wait=False)
 
@@ -204,8 +208,8 @@ async def evaluate(request: FullAnalysisRequest):
         component=request.component,
         metrics={
             "H": mA_resp.overall_rms,
-            "V": mA_resp.overall_rms * 0.85,  # Proxy — real system has tri-axial
-            "A": mA_resp.overall_rms * 0.6,
+            "V": mA_resp.overall_rms * TRIAXIAL_PROXY["v_from_h"],
+            "A": mA_resp.overall_rms * TRIAXIAL_PROXY["a_from_h"],
             "kurtosis": mA_resp.kurtosis,
             "crest_factor": mA_resp.crest_factor,
             "temperature": 0.0,
@@ -321,14 +325,7 @@ async def evaluate(request: FullAnalysisRequest):
     trace.moduleF = mF_resp
 
     # ────── Final severity level ──────
-    if s_eff >= 0.8:
-        final_level = SeverityLevel.alarm
-    elif s_eff >= 0.5:
-        final_level = SeverityLevel.warning
-    elif s_eff >= 0.3:
-        final_level = SeverityLevel.watch
-    else:
-        final_level = SeverityLevel.normal
+    final_level = classify_severity(s_eff)
 
     # Recommended action = best from E, window from F
     rec_action = mD_resp.recommended_action

@@ -1,0 +1,32 @@
+# RAPID AI — System Profiles (weight per block)
+# Each profile defines how block scores are weighted to compute SSI.
+
+pump_train_horizontal:
+  id: "PROFILE_PUMP_A"
+  weights:
+    foundation: 0.15
+    ac_motor: 0.10
+    coupling: 0.10
+    shafts: 0.10
+    afb: 0.25
+    fluid_flow: 0.30
+
+gearbox_train:
+  id: "PROFILE_GBX_A"
+  weights:
+    foundation: 0.15
+    ac_motor: 0.10
+    coupling: 0.10
+    shafts: 0.10
+    gears: 0.35
+    afb: 0.20
+
+fan_train:
+  id: "PROFILE_FAN_A"
+  weights:
+    foundation: 0.15
+    ac_motor: 0.15
+    coupling: 0.05
+    shafts: 0.10
+    afb: 0.25
+    fluid_flow: 0.30

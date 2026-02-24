@@ -1,26 +1,20 @@
 import { NavLink } from 'react-router-dom'
-import type { Scenario } from '../types/rapid-ai'
+import { useAnalysis } from '../context/AnalysisContext'
 
 interface Props {
   children: React.ReactNode
-  scenarios: Scenario[]
-  activeScenario: string
-  onScenarioChange: (id: string) => void
 }
 
 const navItems = [
-  { to: '/', label: 'Pipeline Dashboard', icon: '⚡' },
-  { to: '/modules', label: 'Module Explorer', icon: '🔬' },
-  { to: '/reliability', label: 'Reliability View', icon: '📊' },
+  { to: '/', label: 'New Analysis', icon: '\u26A1' },
+  { to: '/results', label: 'Dashboard', icon: '\uD83D\uDCC8' },
+  { to: '/modules', label: 'Module Explorer', icon: '\uD83D\uDD2C' },
+  { to: '/reliability', label: 'Reliability', icon: '\uD83D\uDCCA' },
 ]
 
-const scenarioIcons: Record<string, string> = {
-  healthy: '🟢',
-  degrading: '🟡',
-  critical: '🔴',
-}
+export default function Layout({ children }: Props) {
+  const { result } = useAnalysis()
 
-export default function Layout({ children, scenarios, activeScenario, onScenarioChange }: Props) {
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar */}
@@ -56,31 +50,24 @@ export default function Layout({ children, scenarios, activeScenario, onScenario
           ))}
         </nav>
 
-        {/* Scenario Selector */}
-        <div className="p-3 border-t border-slate-800">
-          <p className="text-[10px] text-slate-500 uppercase tracking-widest px-3 mb-2">
-            Scenario
-          </p>
-          {scenarios.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => onScenarioChange(s.id)}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
-                activeScenario === s.id
-                  ? 'bg-slate-800 text-white font-medium'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
-            >
-              <span>{scenarioIcons[s.id] || '⚪'}</span>
-              {s.name}
-            </button>
-          ))}
-        </div>
+        {/* Current Analysis Info */}
+        {result && (
+          <div className="p-3 border-t border-slate-800">
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest px-3 mb-2">
+              Current Analysis
+            </p>
+            <div className="px-3 space-y-1">
+              <div className="text-sm text-white font-medium">{result.asset_id}</div>
+              <div className="text-[10px] text-slate-500">{result.health_stage} &mdash; {result.final_severity_level}</div>
+              <div className="text-[10px] text-slate-600 font-mono">{result.trace_id}</div>
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="p-4 border-t border-slate-800 text-[10px] text-slate-600">
-          <div>MOCK MODE</div>
-          <div className="mt-1">v1.0.0 — Physics-Grounded</div>
+          <div>LIVE API MODE</div>
+          <div className="mt-1">v1.0.0 &mdash; Physics-Grounded</div>
         </div>
       </aside>
 

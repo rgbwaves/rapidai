@@ -7,7 +7,7 @@ SI = 1 - (0.5*SE + 0.3*TE + 0.2*DE)
 """
 import time
 import math
-import logging
+import structlog
 import numpy as np
 from typing import Dict, List, Optional
 
@@ -161,7 +161,7 @@ def run(request: ModuleBPPRequest) -> ModuleBPPResponse:
         )
     except Exception as e:
         elapsed = (time.perf_counter() - t0) * 1000
-        logging.getLogger(__name__).error(f"Module B++ error: {e}", exc_info=True)
+        structlog.get_logger(__name__).error("module_error", module="B++", error=str(e), exc_info=True)
         return ModuleBPPResponse(
             execution_time_ms=round(elapsed, 2),
             stability_state=StabilityState.Stable,

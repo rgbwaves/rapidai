@@ -1,0 +1,39 @@
+# RAPID AI — Block Score Rules (BSR001–BSR007)
+# Priority-ordered: first matching rule wins.
+# These rules determine individual block scores from B + B+ outputs.
+
+rules:
+  - id: "BSR007"
+    description: "Very strong initiator"
+    condition: "b_match >= 0.90"
+    score: 0.90
+
+  - id: "BSR001"
+    description: "Accelerating + high confidence"
+    condition: "trend_class == Accelerating AND confidence >= 0.70"
+    score: 0.85
+
+  - id: "BSR003"
+    description: "Step + high confidence"
+    condition: "trend_class == Step AND confidence >= 0.70"
+    score: 0.80
+
+  - id: "BSR002"
+    description: "Drift + moderate confidence"
+    condition: "trend_class == Drift AND confidence >= 0.60"
+    score: 0.65
+
+  - id: "BSR004"
+    description: "Chaotic + high process correlation"
+    condition: "trend_class == Chaotic AND process_corr >= 0.70"
+    score: 0.35
+
+  - id: "BSR005"
+    description: "Initiator present but trend stable"
+    condition: "b_match >= 0.70 AND (trend_class == Stable OR confidence < 0.50)"
+    score: 0.55
+
+  - id: "BSR006"
+    description: "No initiator + stable"
+    condition: "b_match < 0.30 AND trend_class == Stable"
+    score: 0.15

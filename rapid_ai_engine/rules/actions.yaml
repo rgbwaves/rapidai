@@ -1,0 +1,50 @@
+# RAPID AI — Action Catalog (ACT001–ACT008)
+# Source of truth for maintenance actions and diagnosis mapping.
+
+actions:
+  ACT001:
+    title: "Vibration re-measure (confirmation run)"
+    justification: "Confirm trend before committing to intervention"
+    verification: "Compare new RMS to previous within \u00b110%"
+  ACT002:
+    title: "Bearing lubrication / grease replenishment"
+    justification: "High frequency or temperature rise indicates lubrication deficit"
+    verification: "HF amplitude and temperature return to baseline within 24h"
+  ACT003:
+    title: "Alignment check (laser / dial indicator)"
+    justification: "Axial dominance and coupling signature indicate misalignment"
+    verification: "Alignment report within tolerance per OEM spec"
+  ACT004:
+    title: "Balance correction (single / dual plane)"
+    justification: "1\u00d7 dominance with horizontal preference indicates imbalance"
+    verification: "1\u00d7 amplitude reduced by \u226550% post-correction"
+  ACT005:
+    title: "Bearing replacement (scheduled)"
+    justification: "BPFO/BPFI signatures with acceleration confirms bearing defect"
+    verification: "Post-replacement vibration within acceptance limits"
+  ACT006:
+    title: "Foundation tightening / soft foot correction"
+    justification: "V/H ratio and looseness indicate structural issues"
+    verification: "Phase stability and reduced looseness harmonics"
+  ACT007:
+    title: "Process investigation (not machine fault)"
+    justification: "Trend correlates with process variable, not machine degradation"
+    verification: "Vibration returns to normal with process stabilisation"
+  ACT008:
+    title: "Emergency shutdown / trip recommendation"
+    justification: "Critical SSI with accelerating trend, imminent failure risk"
+    verification: "Machine isolated, inspection completed before restart"
+
+diagnosis_map:
+  imbalanc: ["ACT004", "ACT001"]
+  unbalanc: ["ACT004", "ACT001"]
+  misalign: ["ACT003", "ACT001"]
+  bearing:  ["ACT002", "ACT005"]
+  lubric:   ["ACT002"]
+  loose:    ["ACT006", "ACT001"]
+  foundation: ["ACT006"]
+  process:  ["ACT007"]
+  critical: ["ACT008"]
+  shutdown: ["ACT008"]
+  cavitat:  ["ACT007", "ACT001"]
+  resonan:  ["ACT006", "ACT001"]

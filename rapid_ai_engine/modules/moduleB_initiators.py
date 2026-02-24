@@ -6,7 +6,7 @@ across 12 component types (AFB, JB, TPJB, couplings, motors, etc.).
 Each rule uses AND logic on directional ratios + supplementary metrics.
 """
 import time
-import logging
+import structlog
 from typing import Dict, List, Any, Optional
 from ..schemas import ModuleBRequest, ModuleBResponse, MatchedRule
 
@@ -482,7 +482,7 @@ def run(request: ModuleBRequest) -> ModuleBResponse:
         )
     except Exception as e:
         elapsed = (time.perf_counter() - t0) * 1000
-        logging.getLogger(__name__).error(f"Module B error: {e}", exc_info=True)
+        structlog.get_logger(__name__).error("module_error", module="B", error=str(e), exc_info=True)
         return ModuleBResponse(
             execution_time_ms=round(elapsed, 2),
             component=request.component,
