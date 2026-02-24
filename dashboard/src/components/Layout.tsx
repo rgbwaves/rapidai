@@ -65,9 +65,18 @@ export default function Layout({ children }: Props) {
         )}
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-800 text-[10px] text-slate-600">
+        <div className="p-4 border-t border-slate-800 text-[10px] text-slate-600 space-y-1.5">
+          <a
+            href="/docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-slate-500 hover:text-sky-400 transition-colors"
+          >
+            <span>API Docs (Swagger)</span>
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+          </a>
           <div>LIVE API MODE</div>
-          <div className="mt-1">v1.0.0 &mdash; Physics-Grounded</div>
+          <div>v1.0.0 &mdash; Physics-Grounded</div>
         </div>
       </aside>
 
