@@ -19,6 +19,8 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ""
+    environment:
+      - SERVICE_FQDN_DASHBOARD=https://rapidai.rdtect.com
     expose:
       - "80"
     depends_on:
