@@ -14,6 +14,13 @@ export interface EvaluateRequest {
     sampling_rate_hz: number
     values: number[]
   }
+  additional_signals?: Array<{
+    signal_type: string
+    direction: string
+    unit: string
+    sampling_rate_hz: number
+    values: number[]
+  }>
   context?: {
     rpm?: number
     temperature_c?: number

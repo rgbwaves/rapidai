@@ -118,6 +118,39 @@ export default function OverviewDashboard() {
         visible={phase >= 1}
       />
 
+      {/* 1.5 Report Summary */}
+      {result.report && phase >= 1 && (
+        <div className={`transition-all duration-500 ${phase >= 2 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">Analysis Summary</div>
+            <p className="text-sm text-slate-300 leading-relaxed mb-3">{result.report.summary}</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <div className="text-[10px] text-slate-500 uppercase">Likelihood</div>
+                <div className="text-lg font-bold text-white">{result.report.likelihood_pct.toFixed(1)}%</div>
+                <div className="text-[10px] text-slate-500">{result.report.likelihood_text}</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-500 uppercase">Degradation</div>
+                <div className="text-lg font-bold text-white">{result.report.degradation_index.toFixed(2)}</div>
+                <div className="text-[10px] text-slate-500">{result.report.degradation_text}</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-500 uppercase">Top Issue</div>
+                {result.report.issues.length > 0 ? (
+                  <>
+                    <div className="text-sm font-semibold text-white">{result.report.issues[0].initiator}</div>
+                    <div className="text-[10px] text-slate-500">{result.report.issues[0].confidence_pct}% confidence</div>
+                  </>
+                ) : (
+                  <div className="text-sm text-slate-500">No faults detected</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 2. Metric Strip */}
       <MetricStrip
         result={result}

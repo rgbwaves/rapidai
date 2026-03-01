@@ -138,6 +138,30 @@ export interface ModuleFResponse {
 
 // ─── Full Pipeline Response ────────────────────────────────
 
+export interface ReportIssue {
+  rule_id: string
+  initiator: string
+  diagnosis: string
+  confidence_pct: number
+  evidence: string[]
+}
+
+export interface AnalysisReport {
+  likelihood_pct: number
+  likelihood_text: string
+  degradation_index: number
+  degradation_text: string
+  rul_days: number | null
+  stability_state: string
+  health_stage: string
+  severity_level: string
+  risk_index: number
+  recommended_action: string
+  recommended_window: string
+  issues: ReportIssue[]
+  summary: string
+}
+
 export interface ModuleTrace {
   module0: Module0Response | null
   moduleA: ModuleAResponse | null
@@ -163,6 +187,7 @@ export interface FullAnalysisResponse {
   recommended_action: string
   recommended_window: string
   reliability_metrics: ReliabilityMetrics | null
+  report: AnalysisReport | null
   module_trace: ModuleTrace
   execution_time_ms: number
 }

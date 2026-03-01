@@ -130,6 +130,22 @@ export default function AIBrief() {
         </NarrativeParagraph>
       </ChapterBlock>
 
+      {/* Quick Analysis — from API report */}
+      {result.report && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Likelihood</div>
+            <div className="text-2xl font-bold text-white">{result.report.likelihood_pct.toFixed(1)}%</div>
+            <p className="text-xs text-slate-400 mt-1">{result.report.likelihood_text}</p>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Degradation Index</div>
+            <div className="text-2xl font-bold text-white">{result.report.degradation_index.toFixed(2)}</div>
+            <p className="text-xs text-slate-400 mt-1">{result.report.degradation_text}</p>
+          </div>
+        </div>
+      )}
+
       {/* Chapter 2: What We Found */}
       <ChapterBlock
         number={2}
@@ -152,6 +168,34 @@ export default function AIBrief() {
         <NarrativeParagraph label="Fault Analysis">
           {findings.faultFinding}
         </NarrativeParagraph>
+        {result.report && result.report.issues.length > 0 && (
+          <div className="mt-3 space-y-2">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+              Matched Fault Initiators
+            </div>
+            {result.report.issues.map((issue) => (
+              <div key={issue.rule_id} className="bg-slate-800/60 border border-slate-700/40 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-700 text-sky-400">
+                    {issue.rule_id}
+                  </span>
+                  <span className="text-sm font-semibold text-white">{issue.initiator}</span>
+                  <span className="ml-auto text-xs font-bold text-sky-400">{issue.confidence_pct}%</span>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">{issue.diagnosis}</p>
+                {issue.evidence.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {issue.evidence.map((ev, i) => (
+                      <span key={i} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-900/80 text-slate-400 border border-slate-700/50">
+                        {ev}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </ChapterBlock>
 
       {/* Chapter 3: How It's Trending */}
