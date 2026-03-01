@@ -176,7 +176,7 @@ def _build_gear_rules() -> List[dict]:
     return [
         {"rule_id": "GEAR01", "initiator": "Uniform Tooth Wear",
          "diagnosis": "General gear mesh wear",
-         "conditions": [("H_V_ratio", ">=", 1.1)],
+         "conditions": [("H_V_ratio", ">=", 1.2), ("H", ">=", 2.0)],
          "severity_base": 0.5},
         {"rule_id": "GEAR02", "initiator": "Localized Pitting",
          "diagnosis": "Localized tooth surface pitting",
@@ -239,7 +239,7 @@ def _build_shaft_rules() -> List[dict]:
          "severity_base": 0.6},
         {"rule_id": "S05", "initiator": "Shaft Crack",
          "diagnosis": "Propagating transverse crack — catastrophic risk",
-         "conditions": [("A_H_ratio", ">=", 0.4)],
+         "conditions": [("A_H_ratio", ">=", 0.8), ("kurtosis", ">=", 4.0)],
          "severity_base": 0.95},
     ]
 
@@ -269,7 +269,7 @@ def _build_tpjb_rules() -> List[dict]:
          "severity_base": 0.8},
         {"rule_id": "TPJB06", "initiator": "Thermal Distortion",
          "diagnosis": "Pad thermal bowing from uneven heat distribution",
-         "conditions": [("temperature", ">=", 70), ("A_H_ratio", ">=", 0.5)],
+         "conditions": [("temperature", ">=", 70), ("A_H_ratio", ">=", 0.7), ("V", ">=", 1.5)],
          "severity_base": 0.5},
         {"rule_id": "TPJB07", "initiator": "Shaft Misalignment",
          "diagnosis": "Misalignment loading pads unevenly",
@@ -469,7 +469,7 @@ def run(request: ModuleBRequest) -> ModuleBResponse:
                     triggered_conditions=triggered,
                 ))
 
-        # Confidence = best match score (conservative)
+        # Confidence = highest matched rule severity
         confidence = max((m.score for m in matched), default=0.0)
 
         elapsed = (time.perf_counter() - t0) * 1000

@@ -122,52 +122,59 @@ export function generateTriaxial(
   severity: number,
   params: Partial<SignalParams> = {},
 ): TriaxialSignals {
-  const p = { ...DEFAULT_PARAMS, ...params }
+  // Strip amplitude from params so each generator's physics-based amplitude
+  // isn't overwritten by DEFAULT_PARAMS.amplitude (2.0). Only pass through
+  // samplingRate, duration, noiseLevel.
+  const { amplitude: _drop, ...nonAmpParams } = { ...DEFAULT_PARAMS, ...params }
+  const p = nonAmpParams as Partial<SignalParams>
 
   switch (presetId) {
     case 'bearing': {
-      const h = generateBearingDefect(p, severity)
       // Bearing: H ≈ V (ratio ~1.0), low A — kurtosis/crest fire the rules
-      const vAmp = 0.9 + severity * 0.05
-      const aAmp = 0.3 + severity * 0.1
-      const v = generateBearingDefect({ ...p, amplitude: (4.0 + severity * 6.0) * vAmp }, severity)
-      const a = generateHealthy({ ...p, amplitude: (4.0 + severity * 6.0) * aAmp, noiseLevel: 0.2 })
+      const hAmp = 4.0 + severity * 6.0
+      const vAmp = hAmp * (0.9 + severity * 0.05)
+      const aAmp = hAmp * (0.3 + severity * 0.1)
+      const h = generateBearingDefect({ ...p, amplitude: hAmp }, severity)
+      const v = generateBearingDefect({ ...p, amplitude: vAmp }, severity)
+      const a = generateHealthy({ ...p, amplitude: aAmp, noiseLevel: 0.2 })
       return { h, v, a }
     }
     case 'imbalance': {
-      const h = generateImbalance(p, severity)
-      // Imbalance: H dominant, V lower (H_V ≈ 1.5), A very low (A_H < 0.3)
-      const vScale = 0.55 + (1 - severity) * 0.15  // 0.55–0.70 → H_V ≈ 1.4–1.8
-      const aScale = 0.10 + (1 - severity) * 0.05  // 0.10–0.15 → A_H < 0.3
-      const v = generateImbalance({ ...p, amplitude: (3.0 + severity * 5.0) * vScale }, severity)
-      const a = generateHealthy({ ...p, amplitude: (3.0 + severity * 5.0) * aScale, noiseLevel: 0.1 })
+      // Imbalance: H dominant, V lower (H_V ≈ 1.4–1.8), A very low (A_H < 0.3)
+      const hAmp = 3.0 + severity * 5.0
+      const vScale = 0.55 + (1 - severity) * 0.15  // 0.55–0.70
+      const aScale = 0.10 + (1 - severity) * 0.05  // 0.10–0.15
+      const h = generateImbalance({ ...p, amplitude: hAmp }, severity)
+      const v = generateImbalance({ ...p, amplitude: hAmp * vScale }, severity)
+      const a = generateHealthy({ ...p, amplitude: hAmp * aScale, noiseLevel: 0.1 })
       return { h, v, a }
     }
     case 'misalignment': {
-      const h = generateMisalignment(p, severity)
-      // Misalignment: A dominant (A_H ≈ 1.5), V moderate
-      const baseAmp = 3.0 + severity * 4.0
+      // Misalignment: A dominant (A_H ≈ 1.5–2.0), V moderate
+      const hAmp = 3.0 + severity * 4.0
       const vScale = 0.8
-      const aScale = 1.5 + severity * 0.5  // A_H ≈ 1.5–2.0
-      const v = generateMisalignment({ ...p, amplitude: baseAmp * vScale }, severity)
-      const a = generateMisalignment({ ...p, amplitude: baseAmp * aScale }, severity)
+      const aScale = 1.5 + severity * 0.5
+      const h = generateMisalignment({ ...p, amplitude: hAmp }, severity)
+      const v = generateMisalignment({ ...p, amplitude: hAmp * vScale }, severity)
+      const a = generateMisalignment({ ...p, amplitude: hAmp * aScale }, severity)
       return { h, v, a }
     }
     case 'looseness': {
-      const h = generateLooseness(p, severity)
-      // Looseness: V dominant (V_H ≈ 1.5), A low
-      const baseAmp = 2.5 + severity * 5.0
-      const vScale = 1.5 + severity * 0.3  // V_H ≈ 1.5–1.8
+      // Looseness: V dominant (V_H ≈ 1.5–1.8), A low
+      const hAmp = 2.5 + severity * 5.0
+      const vScale = 1.5 + severity * 0.3
       const aScale = 0.2 + severity * 0.1
-      const v = generateLooseness({ ...p, amplitude: baseAmp * vScale }, severity)
-      const a = generateHealthy({ ...p, amplitude: baseAmp * aScale, noiseLevel: 0.3 + severity * 0.3 })
+      const h = generateLooseness({ ...p, amplitude: hAmp }, severity)
+      const v = generateLooseness({ ...p, amplitude: hAmp * vScale }, severity)
+      const a = generateHealthy({ ...p, amplitude: hAmp * aScale, noiseLevel: 0.3 + severity * 0.3 })
       return { h, v, a }
     }
     default: {
-      // Healthy: balanced H ≈ V ≈ A
-      const h = generateHealthy(p)
-      const v = generateHealthy({ ...p, amplitude: p.amplitude * 0.95 })
-      const a = generateHealthy({ ...p, amplitude: p.amplitude * 0.6 })
+      // Healthy: balanced H ≈ V ≈ A — no ratio-based rules should fire
+      const hAmp = (params.amplitude ?? DEFAULT_PARAMS.amplitude)
+      const h = generateHealthy({ ...p, amplitude: hAmp })
+      const v = generateHealthy({ ...p, amplitude: hAmp * 0.95 })
+      const a = generateHealthy({ ...p, amplitude: hAmp * 0.6 })
       return { h, v, a }
     }
   }
