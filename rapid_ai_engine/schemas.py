@@ -382,6 +382,29 @@ class ModuleTrace(BaseModel):
     moduleE: Optional[ModuleEResponse] = None
     moduleF: Optional[ModuleFResponse] = None
 
+class ReportIssue(BaseModel):
+    rule_id: str
+    initiator: str
+    diagnosis: str
+    confidence_pct: float
+    evidence: List[str] = Field(default_factory=list)
+
+class AnalysisReport(BaseModel):
+    """Human-readable analysis summary built from all module outputs."""
+    likelihood_pct: float = 0.0
+    likelihood_text: str = ""
+    degradation_index: float = 0.0
+    degradation_text: str = ""
+    rul_days: Optional[float] = None
+    stability_state: str = "Unknown"
+    health_stage: str = "Unknown"
+    severity_level: str = "unknown"
+    risk_index: float = 0.0
+    recommended_action: str = "Continue monitoring"
+    recommended_window: str = "Planned"
+    issues: List[ReportIssue] = Field(default_factory=list)
+    summary: str = ""
+
 class FullAnalysisResponse(BaseModel):
     schema_version: str = "1.0"
     trace_id: Optional[str] = None
@@ -395,5 +418,6 @@ class FullAnalysisResponse(BaseModel):
     recommended_action: str = "Continue monitoring"
     recommended_window: str = "Planned"
     reliability_metrics: Optional[ReliabilityMetrics] = None
+    report: Optional[AnalysisReport] = None
     module_trace: ModuleTrace = Field(default_factory=ModuleTrace)
     execution_time_ms: Optional[float] = None

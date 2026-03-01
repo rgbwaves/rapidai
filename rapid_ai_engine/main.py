@@ -36,6 +36,7 @@ from .schemas import (
     ModuleFRequest, ModuleFResponse,
     # Orchestrator
     FullAnalysisRequest, FullAnalysisResponse, ModuleTrace,
+    AnalysisReport, ReportIssue,
     SeverityLevel, HealthStage,
 )
 
@@ -138,6 +139,76 @@ def _extract_temperature(context: Optional[ContextInput]) -> float:
     if context and context.temperature_c is not None:
         return context.temperature_c
     return 0.0
+
+
+def _build_report(
+    mA_resp: "ModuleAResponse",
+    mB_resp: "ModuleBResponse",
+    mBpp_resp: "ModuleBPPResponse",
+    mF_resp: "ModuleFResponse",
+    health_stage: HealthStage,
+    severity_level: SeverityLevel,
+    risk_index: float,
+    rul_days: float,
+    rec_action: str,
+    rec_window: str,
+) -> AnalysisReport:
+    """Build human-readable analysis report from all module outputs."""
+    likelihood = mF_resp.failure_probability_30d * 100
+
+    if likelihood < 10:
+        lk_text = "Very low risk. System is healthy."
+    elif likelihood < 30:
+        lk_text = "Low risk of failure. System is operating within safe parameters."
+    elif likelihood < 60:
+        lk_text = "Moderate risk. Plan preventive maintenance."
+    else:
+        lk_text = "High risk. Immediate attention required."
+
+    degradation = mA_resp.degradation
+    if degradation < 0.3:
+        dg_text = "Minimal degradation. No action needed."
+    elif degradation < 1.0:
+        dg_text = "Early degradation detected. Trend monitoring recommended."
+    elif degradation < 3.0:
+        dg_text = "Moderate degradation. Monitor and schedule maintenance."
+    else:
+        dg_text = "Significant degradation. Prioritize inspection."
+
+    issues = []
+    for r in sorted(mB_resp.matched_rules, key=lambda x: x.score, reverse=True):
+        evidence = [
+            f"{c['expr']}={c['value']}" for c in r.triggered_conditions
+        ]
+        issues.append(ReportIssue(
+            rule_id=r.rule_id,
+            initiator=r.initiator,
+            diagnosis=r.diagnosis,
+            confidence_pct=round(r.score * 100, 1),
+            evidence=evidence,
+        ))
+
+    if issues:
+        top = issues[0]
+        summary = f"{top.initiator}: {top.diagnosis}"
+    else:
+        summary = "No fault initiators matched. System appears to be operating normally."
+
+    return AnalysisReport(
+        likelihood_pct=round(likelihood, 2),
+        likelihood_text=lk_text,
+        degradation_index=round(degradation, 2),
+        degradation_text=dg_text,
+        rul_days=rul_days,
+        stability_state=mBpp_resp.stability_state.value,
+        health_stage=health_stage.value,
+        severity_level=severity_level.value,
+        risk_index=round(risk_index, 2),
+        recommended_action=rec_action,
+        recommended_window=rec_window,
+        issues=issues,
+        summary=summary,
+    )
 
 
 # ─── Health Check ──────────────────────────────────────────────
@@ -390,6 +461,20 @@ async def evaluate(request: FullAnalysisRequest):
     if mE_resp.plan_items:
         rec_action = mE_resp.plan_items[0].action_title
 
+    # ────── Build Analysis Report ──────
+    report = _build_report(
+        mA_resp=mA_resp,
+        mB_resp=mB_resp,
+        mBpp_resp=mBpp_resp,
+        mF_resp=mF_resp,
+        health_stage=mD_resp.degradation_stage,
+        severity_level=final_level,
+        risk_index=mF_resp.risk_index,
+        rul_days=mF_resp.RUL_days,
+        rec_action=rec_action,
+        rec_window=mF_resp.recommended_window,
+    )
+
     elapsed = (time.perf_counter() - t0) * 1000
     return FullAnalysisResponse(
         schema_version=request.schema_version,
@@ -404,6 +489,7 @@ async def evaluate(request: FullAnalysisRequest):
         recommended_action=rec_action,
         recommended_window=mF_resp.recommended_window,
         reliability_metrics=mF_resp.reliability_metrics,
+        report=report,
         module_trace=trace,
         execution_time_ms=round(elapsed, 2),
     )
