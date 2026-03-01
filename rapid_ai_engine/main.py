@@ -7,7 +7,9 @@ import uuid
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Optional, List, Dict
+
+import numpy as np
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .schemas import (
     # Module 0
     Module0Request, Module0Response,
+    SignalInput, ContextInput,
     # Module A
     ModuleARequest, ModuleAResponse, SignalType, Direction,
     # Module B
@@ -75,6 +78,66 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ─── Triaxial Helpers ─────────────────────────────────────────
+
+def _extract_triaxial_metrics(
+    h_rms: float,
+    additional_signals: Optional[List[SignalInput]],
+) -> Dict[str, float]:
+    """Compute H/V/A RMS values from real signals when available, else proxy."""
+    result = {"H": h_rms}
+    v_vals = None
+    a_vals = None
+
+    if additional_signals:
+        for sig in additional_signals:
+            direction = sig.direction.value.upper()
+            if direction == "V" and sig.values:
+                v_vals = sig.values
+            elif direction == "A" and sig.values:
+                a_vals = sig.values
+
+    if v_vals is not None:
+        arr = np.array(v_vals)
+        result["V"] = float(np.sqrt(np.mean(arr**2)))
+    else:
+        result["V"] = h_rms * TRIAXIAL_PROXY["v_from_h"]
+
+    if a_vals is not None:
+        arr = np.array(a_vals)
+        result["A"] = float(np.sqrt(np.mean(arr**2)))
+    else:
+        result["A"] = h_rms * TRIAXIAL_PROXY["a_from_h"]
+
+    return result
+
+
+def _extract_triaxial_spectra(
+    h_values: List[float],
+    additional_signals: Optional[List[SignalInput]],
+) -> Dict[str, List[float]]:
+    """Extract raw spectra for H/V/A channels for Module B++."""
+    spectra: Dict[str, List[float]] = {
+        "H": h_values[:256] if len(h_values) >= 256 else h_values,
+        "V": [],
+        "A": [],
+    }
+    if additional_signals:
+        for sig in additional_signals:
+            direction = sig.direction.value.upper()
+            if direction in ("V", "A") and sig.values:
+                vals = sig.values[:256] if len(sig.values) >= 256 else sig.values
+                spectra[direction] = vals
+    return spectra
+
+
+def _extract_temperature(context: Optional[ContextInput]) -> float:
+    """Return temperature from context if available, 0.0 otherwise."""
+    if context and context.temperature_c is not None:
+        return context.temperature_c
+    return 0.0
 
 
 # ─── Health Check ──────────────────────────────────────────────
@@ -202,17 +265,16 @@ async def evaluate(request: FullAnalysisRequest):
     trace.moduleA = mA_resp
 
     # ────── B / B+ / B++ in Parallel ──────
-    # Module B request
+    # Module B request — use real triaxial data when available
+    triaxial = _extract_triaxial_metrics(mA_resp.overall_rms, request.additional_signals)
     mB_req = ModuleBRequest(
         asset_id=request.asset_id,
         component=request.component,
         metrics={
-            "H": mA_resp.overall_rms,
-            "V": mA_resp.overall_rms * TRIAXIAL_PROXY["v_from_h"],
-            "A": mA_resp.overall_rms * TRIAXIAL_PROXY["a_from_h"],
+            **triaxial,
             "kurtosis": mA_resp.kurtosis,
             "crest_factor": mA_resp.crest_factor,
-            "temperature": 0.0,
+            "temperature": _extract_temperature(request.context),
         },
     )
 
@@ -228,11 +290,7 @@ async def evaluate(request: FullAnalysisRequest):
     # Module B++ request (needs spectra — derive from signal)
     mBpp_req = ModuleBPPRequest(
         asset_id=request.asset_id,
-        spectra={
-            "H": request.signal.values[:256] if len(request.signal.values) >= 256 else request.signal.values,
-            "V": [],
-            "A": [],
-        },
+        spectra=_extract_triaxial_spectra(request.signal.values, request.additional_signals),
     )
 
     # Run in parallel

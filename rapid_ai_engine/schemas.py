@@ -360,6 +360,7 @@ class FullAnalysisRequest(BaseModel):
     machine_type: str = "generic"
     system_type: str = "pump_train_horizontal"
     signal: SignalInput
+    additional_signals: Optional[List[SignalInput]] = None
     context: Optional[ContextInput] = None
     # Module B needs component type
     component: str = "afb"
