@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAnalysis } from '../context/AnalysisContext'
-import { SIGNAL_PRESETS, generateHealthy } from '../utils/signalGenerator'
+import { SIGNAL_PRESETS, generateTriaxial } from '../utils/signalGenerator'
 import type { EvaluateRequest } from '../api/evaluate'
 import SignalWaveform from '../components/SignalWaveform'
 
 const MACHINE_TYPES = ['pump_train_horizontal', 'gearbox_train', 'fan_train', 'generic']
 const COMPONENTS = ['afb', 'journal', 'tpjb', 'coupling', 'ac_motor', 'gears', 'seal', 'shaft', 'belts', 'chains', 'dc_motor', 'impeller']
 const SIGNAL_TYPES = ['velocity', 'acceleration', 'displacement']
-const DIRECTIONS = ['H', 'V', 'A']
 const UNITS: Record<string, string> = { velocity: 'mm/s', acceleration: 'g', displacement: 'um' }
 
 export default function RequestBuilder() {
@@ -23,35 +22,36 @@ export default function RequestBuilder() {
   const [failureThreshold, setFailureThreshold] = useState(11.2)
   const [operatingHours, setOperatingHours] = useState(8760)
 
+  // Context config
+  const [rpm, setRpm] = useState(1800)
+  const [temperatureC, setTemperatureC] = useState(72)
+
   // Signal config
   const [signalType, setSignalType] = useState(SIGNAL_TYPES[0])
-  const [direction, setDirection] = useState(DIRECTIONS[0])
   const [samplingRate, setSamplingRate] = useState(6400)
 
   // Signal generator
   const [selectedPreset, setSelectedPreset] = useState<string>(SIGNAL_PRESETS[0].id)
   const [severity, setSeverity] = useState(0.5)
-  const [previewValues, setPreviewValues] = useState<number[]>(() => generateHealthy())
+  const [previewValues, setPreviewValues] = useState<number[]>(() => generateTriaxial('healthy', 0.5, { samplingRate }).h)
 
-  function generateSignal(presetId: string, sev: number): number[] {
-    const preset = SIGNAL_PRESETS.find((p) => p.id === presetId)
-    if (!preset) return generateHealthy({ samplingRate })
-    if (preset.id === 'healthy') return (preset.generate as (p?: Partial<import('../utils/signalGenerator').SignalParams>) => number[])({ samplingRate })
-    return (preset.generate as (p: Partial<import('../utils/signalGenerator').SignalParams>, s: number) => number[])({ samplingRate }, sev)
+  function regeneratePreview(presetId: string, sev: number) {
+    setPreviewValues(generateTriaxial(presetId, sev, { samplingRate }).h)
   }
 
   function handlePresetChange(presetId: string) {
     setSelectedPreset(presetId)
-    setPreviewValues(generateSignal(presetId, severity))
+    regeneratePreview(presetId, severity)
   }
 
   function handleSeverityChange(newSev: number) {
     setSeverity(newSev)
-    setPreviewValues(generateSignal(selectedPreset, newSev))
+    regeneratePreview(selectedPreset, newSev)
   }
 
   async function handleSubmit() {
-    const values = generateSignal(selectedPreset, severity)
+    const triaxial = generateTriaxial(selectedPreset, severity, { samplingRate })
+    const unit = UNITS[signalType] || 'mm/s'
 
     const request: EvaluateRequest = {
       schema_version: '1.0',
@@ -61,14 +61,30 @@ export default function RequestBuilder() {
       system_type: machineType,
       signal: {
         signal_type: signalType,
-        direction,
-        unit: UNITS[signalType] || 'mm/s',
+        direction: 'H',
+        unit,
         sampling_rate_hz: samplingRate,
-        values,
+        values: triaxial.h,
       },
+      additional_signals: [
+        {
+          signal_type: signalType,
+          direction: 'V',
+          unit,
+          sampling_rate_hz: samplingRate,
+          values: triaxial.v,
+        },
+        {
+          signal_type: signalType,
+          direction: 'A',
+          unit,
+          sampling_rate_hz: samplingRate,
+          values: triaxial.a,
+        },
+      ],
       context: {
-        rpm: 1800,
-        temperature_c: 45,
+        rpm,
+        temperature_c: temperatureC,
       },
       component,
       historical_timestamps: [],
@@ -164,6 +180,36 @@ export default function RequestBuilder() {
               className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-sky-500"
             />
           </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">RPM</label>
+            <input
+              type="number"
+              value={rpm}
+              onChange={(e) => setRpm(Number(e.target.value))}
+              className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-sky-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">
+              Temperature: {temperatureC}°C
+            </label>
+            <input
+              type="range"
+              min={20}
+              max={120}
+              step={1}
+              value={temperatureC}
+              onChange={(e) => setTemperatureC(Number(e.target.value))}
+              className="w-full accent-sky-500"
+            />
+            <div className="flex justify-between text-[10px] text-slate-600">
+              <span>20°C</span>
+              <span className={temperatureC >= 65 ? 'text-amber-500 font-bold' : ''}>
+                {temperatureC >= 65 ? 'Elevated' : '65°C threshold'}
+              </span>
+              <span>120°C</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -184,16 +230,13 @@ export default function RequestBuilder() {
             </select>
           </div>
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Direction</label>
-            <select
-              value={direction}
-              onChange={(e) => setDirection(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-sky-500"
-            >
-              {DIRECTIONS.map((d) => (
-                <option key={d} value={d}>{d}</option>
+            <label className="block text-xs text-slate-400 mb-1">Directions</label>
+            <div className="flex items-center gap-1.5 h-[38px]">
+              {['H', 'V', 'A'].map((d) => (
+                <span key={d} className="px-2.5 py-1 rounded bg-sky-500/20 text-sky-400 text-xs font-bold">{d}</span>
               ))}
-            </select>
+              <span className="text-[10px] text-slate-500 ml-1">Triaxial</span>
+            </div>
           </div>
           <div>
             <label className="block text-xs text-slate-400 mb-1">Sampling Rate (Hz)</label>
@@ -206,7 +249,7 @@ export default function RequestBuilder() {
           </div>
         </div>
         <div className="mt-2 text-xs text-slate-500">
-          Unit: {UNITS[signalType] || 'mm/s'}
+          Unit: {UNITS[signalType] || 'mm/s'} — All three channels (H, V, A) are sent for directional ratio analysis
         </div>
       </div>
 

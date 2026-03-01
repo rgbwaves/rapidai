@@ -95,3 +95,80 @@ export const SIGNAL_PRESETS = [
   { id: 'misalignment', name: 'Misalignment', generate: generateMisalignment, description: '2x dominant, axial' },
   { id: 'looseness', name: 'Looseness', generate: generateLooseness, description: 'Sub-harmonics + broadband' },
 ] as const
+
+/**
+ * Triaxial signal set — H, V, A channels with physics-based amplitude ratios.
+ * Each fault type produces characteristic directional signatures that Module B
+ * uses for initiator rule matching.
+ */
+export interface TriaxialSignals {
+  h: number[]
+  v: number[]
+  a: number[]
+}
+
+/**
+ * Generate triaxial (H, V, A) signals for a given preset.
+ *
+ * Amplitude ratios per fault type (based on vibration physics):
+ *   Healthy:      H ≈ V ≈ A (ratios ~1.0) → no ratio-based rules fire
+ *   Bearing:      H ≈ V, low A, high kurtosis → AFB03/05/11 fire
+ *   Imbalance:    H >> V, low A (H_V ≈ 1.5, A_H ≈ 0.15) → AFB06 fires
+ *   Misalignment: A >> H (A_H ≈ 1.5), V moderate → AFB07/AFB14 fire
+ *   Looseness:    V >> H (V_H ≈ 1.5), broadband → AFB10 fires
+ */
+export function generateTriaxial(
+  presetId: string,
+  severity: number,
+  params: Partial<SignalParams> = {},
+): TriaxialSignals {
+  const p = { ...DEFAULT_PARAMS, ...params }
+
+  switch (presetId) {
+    case 'bearing': {
+      const h = generateBearingDefect(p, severity)
+      // Bearing: H ≈ V (ratio ~1.0), low A — kurtosis/crest fire the rules
+      const vAmp = 0.9 + severity * 0.05
+      const aAmp = 0.3 + severity * 0.1
+      const v = generateBearingDefect({ ...p, amplitude: (4.0 + severity * 6.0) * vAmp }, severity)
+      const a = generateHealthy({ ...p, amplitude: (4.0 + severity * 6.0) * aAmp, noiseLevel: 0.2 })
+      return { h, v, a }
+    }
+    case 'imbalance': {
+      const h = generateImbalance(p, severity)
+      // Imbalance: H dominant, V lower (H_V ≈ 1.5), A very low (A_H < 0.3)
+      const vScale = 0.55 + (1 - severity) * 0.15  // 0.55–0.70 → H_V ≈ 1.4–1.8
+      const aScale = 0.10 + (1 - severity) * 0.05  // 0.10–0.15 → A_H < 0.3
+      const v = generateImbalance({ ...p, amplitude: (3.0 + severity * 5.0) * vScale }, severity)
+      const a = generateHealthy({ ...p, amplitude: (3.0 + severity * 5.0) * aScale, noiseLevel: 0.1 })
+      return { h, v, a }
+    }
+    case 'misalignment': {
+      const h = generateMisalignment(p, severity)
+      // Misalignment: A dominant (A_H ≈ 1.5), V moderate
+      const baseAmp = 3.0 + severity * 4.0
+      const vScale = 0.8
+      const aScale = 1.5 + severity * 0.5  // A_H ≈ 1.5–2.0
+      const v = generateMisalignment({ ...p, amplitude: baseAmp * vScale }, severity)
+      const a = generateMisalignment({ ...p, amplitude: baseAmp * aScale }, severity)
+      return { h, v, a }
+    }
+    case 'looseness': {
+      const h = generateLooseness(p, severity)
+      // Looseness: V dominant (V_H ≈ 1.5), A low
+      const baseAmp = 2.5 + severity * 5.0
+      const vScale = 1.5 + severity * 0.3  // V_H ≈ 1.5–1.8
+      const aScale = 0.2 + severity * 0.1
+      const v = generateLooseness({ ...p, amplitude: baseAmp * vScale }, severity)
+      const a = generateHealthy({ ...p, amplitude: baseAmp * aScale, noiseLevel: 0.3 + severity * 0.3 })
+      return { h, v, a }
+    }
+    default: {
+      // Healthy: balanced H ≈ V ≈ A
+      const h = generateHealthy(p)
+      const v = generateHealthy({ ...p, amplitude: p.amplitude * 0.95 })
+      const a = generateHealthy({ ...p, amplitude: p.amplitude * 0.6 })
+      return { h, v, a }
+    }
+  }
+}
